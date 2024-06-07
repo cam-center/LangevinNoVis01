@@ -43,9 +43,9 @@ public class MySystem {
     private final ArrayList<Link> links = new ArrayList<>();
     private final ArrayList<Bond> bonds = new ArrayList<>();
 
-    // In SpringSaLad the ratio k / BT = 100 nm−2 is the same for all bonds and links;
+    // In SpringSaLad the ratio k / (k_B * T) = 100 nm−2 is the same for all bonds and links;
     // this allows us to use time steps ~ 1-100 ns for biologically relevant diffusion coefficients
-    // (where B is the Boltzmann constant, T is an absolute temperature)
+    // (where k_B is the Boltzmann constant, T is an absolute temperature, k is the spring constant)
     public final static int SpringConstant = 100;
     
     // To quickly add and remove molecules, it will help to have a hashmap which 
