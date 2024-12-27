@@ -21,6 +21,7 @@ import edu.uchc.cam.langevin.g.reaction.GBindingReaction;
 import edu.uchc.cam.langevin.g.reaction.GTransitionReaction;
 import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
 
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -77,6 +78,7 @@ public class Global {
     private final File outputFile;  // The file we write the updates to.
     
     private boolean countClusters;
+    private BigInteger startSeed = null;    // TODO: parse this from the input file
     
     public Global(File inFile){
         
@@ -128,6 +130,11 @@ public class Global {
     /* ************* COUNT CLUSTERS BOOLEAN *******************************/
     public boolean isCountingClusters(){
         return countClusters;
+    }
+
+    /* ************* START SEED BIG INTEGER *******************************/
+    public BigInteger getStartSeed() {
+        return startSeed;
     }
     
     /* *************** GET THE SYTEM TIMES *********************************/
