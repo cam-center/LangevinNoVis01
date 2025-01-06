@@ -44,7 +44,10 @@ public class Global {
     public final static String BOND_COUNTERS = "BOND COUNTERS";
     public final static String SITE_PROPERTY_COUNTERS = "SITE PROPERTY COUNTERS";
     public final static String CLUSTER_COUNTERS = "CLUSTER COUNTERS";
-    
+    public final static String SIMULATION_OPTIONS = "SIMULATION OPTIONS";
+
+    public final static String RandomSeed = "RandomSeed";
+
     // The time data
     private final GSystemTimes systemTimes;
     
@@ -78,7 +81,7 @@ public class Global {
     private final File outputFile;  // The file we write the updates to.
     
     private boolean countClusters;
-    private BigInteger startSeed = null;    // TODO: parse this from the input file
+    private BigInteger startSeed = null;
     
     public Global(File inFile){
         
@@ -394,11 +397,31 @@ public class Global {
                 case SITE_PROPERTY_COUNTERS:
                     GSitePropertyCounter.loadCounters(this, new Scanner(sc.next().trim()));
                     break;
-                case CLUSTER_COUNTERS:
+                case CLUSTER_COUNTERS: {
                     Scanner scanner = new Scanner(sc.next().trim());
                     scanner.next();
                     countClusters = scanner.nextBoolean();
                     break;
+                }
+                case SIMULATION_OPTIONS: {
+                    Scanner scanner = new Scanner(sc.next().trim());
+                    while(scanner.hasNextLine()) {
+                        String [] innerNext = scanner.nextLine().split(":");
+                        switch(innerNext[0]) {
+                            case RandomSeed:
+                                String randomSeed = innerNext[1].trim();
+                                try {
+                                    startSeed = new BigInteger(randomSeed);
+                                } catch(NumberFormatException ex) {
+                                    throw new RuntimeException("Invalid RandomSeed: " + randomSeed);
+                                }
+                                break;
+                            default:
+                                System.out.println("SimulationOptions loadData received unexpected input line. " +
+                                        "Input = " + innerNext[0] + " : " + innerNext[1] );
+                        }
+                    }
+                }
             }
             
         }

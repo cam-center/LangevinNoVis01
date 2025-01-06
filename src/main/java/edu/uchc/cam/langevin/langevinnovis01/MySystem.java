@@ -166,12 +166,14 @@ public class MySystem {
         // if an explicit start random seed was found in the input file, we use it and runCounter
         // // to generate a unique seed for this run, otherwise we just use the current time
         if(g.getStartSeed() == null) {
-            // the granularity of
+            // the granularity of system time may be larger than ms, depending on the OS
             Rand.seedRand(System.currentTimeMillis());
-            rand = new Random(System.currentTimeMillis());
+            long seed = System.currentTimeMillis();
+            rand = new Random(seed);
         } else {
             BigInteger bi = g.getStartSeed();
             long seed = bi.longValue();   // truncates if necessary
+            Rand.seedRand(seed);
             LangevinLCG langevinLCG = new LangevinLCG(seed);
             for(int i=0; i <= getRunCounter(); i++) {
                 seed = langevinLCG.next();
