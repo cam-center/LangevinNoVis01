@@ -68,13 +68,15 @@ public class VCellMessagingLocalTest {
                 [[[data:2.5]]]
                 [[[progress:100.0%]]]
                 """;
-        Assertions.assertEquals(expected_stdout, getStdout());
+        String effective_stdout = normalizeString(getStdout());
+        Assertions.assertEquals(expected_stdout, effective_stdout);
 
         // compare the stderr to the expected stderr
         String expected_stderr = """
                 Simulation Complete in Main() ...
                 """;
-        Assertions.assertEquals(expected_stderr, getStderr());
+        String effective_stderr = normalizeString(getStderr());
+        Assertions.assertEquals(expected_stderr, effective_stderr);
     }
 
     @Test
@@ -103,12 +105,18 @@ public class VCellMessagingLocalTest {
                 [[[data:2.0]]]
                 [[[progress:60.0%]]]
                 """;
-        Assertions.assertEquals(expected_stdout, getStdout());
+        String effective_stdout = normalizeString(getStdout());
+        Assertions.assertEquals(expected_stdout, effective_stdout);
 
         // compare the stderr to the expected stderr
         String expected_stderr = """
                 Failure
                 """;
-        Assertions.assertEquals(expected_stderr, getStderr());
+        String effective_stderr = normalizeString(getStderr());
+        Assertions.assertEquals(expected_stderr, effective_stderr);
+    }
+
+    private static String normalizeString(String input) {   // normalize all to \n
+        return input.replace("\r\n", "\n").replace("\r", "\n");
     }
 }

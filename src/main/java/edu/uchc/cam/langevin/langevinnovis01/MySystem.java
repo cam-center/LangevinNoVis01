@@ -22,6 +22,7 @@ import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.WorkerEvent;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -129,7 +130,26 @@ public class MySystem {
 
     private final VCellMessaging vcellMessaging;
 
-    
+    // simple pseudo random number generator using the LCG algorithm (Linear Congruential Generator)
+    public class LangevinLCG {
+        private long a = 1664525;               // multiplier
+        private long c = 1013904223;            // increment
+        private long m = 4294967296L;           // modulus (2^32)
+        private long initialSeed = 1;           // initial seed
+        private long currentSeed = initialSeed; // current seed
+
+        public LangevinLCG(long seed) {
+            this.initialSeed = seed;
+            this.currentSeed = initialSeed;
+        }
+        public long next() {
+            currentSeed = (a * currentSeed + c) % m;
+            return currentSeed;
+        }
+        public String toString() {
+            return(initialSeed + " " + currentSeed);
+        }
+    }
     /**********************************************************************\
      *                         CONSTRUCTOR                                *
      * The constructor just takes in the global class which was set up    *
@@ -141,9 +161,25 @@ public class MySystem {
     \**********************************************************************/
     
     public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
-        Rand.seedRand(System.currentTimeMillis());
-        rand = new Random(System.currentTimeMillis());
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
+        // if an explicit start random seed was found in the input file, we use it and runCounter
+        // // to generate a unique seed for this run, otherwise we just use the current time
+        if(g.getStartSeed() == null) {
+            // the granularity of system time may be larger than ms, depending on the OS
+            // NOTE: the 2 calls to System.currentTimeMillis() on my Windows machine always returned the same number
+            Rand.seedRand(System.currentTimeMillis());
+            long seed = System.currentTimeMillis();
+            rand = new Random(seed);
+        } else {
+            BigInteger bi = g.getStartSeed();
+            long seed = bi.longValue();   // truncates if necessary
+            LangevinLCG langevinLCG = new LangevinLCG(seed);
+            for(int i=0; i <= getRunCounter(); i++) {
+                seed = langevinLCG.next();
+            }
+            Rand.seedRand(seed);
+            rand = new Random(seed);
+        }
         System.out.println("in solver, running: " + runCounter);
         
         this.g = g;
