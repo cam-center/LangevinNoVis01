@@ -162,22 +162,22 @@ public class MySystem {
     
     public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging){
         // <editor-fold defaultstate="collapsed" desc="Method Code">
-
         // if an explicit start random seed was found in the input file, we use it and runCounter
         // // to generate a unique seed for this run, otherwise we just use the current time
         if(g.getStartSeed() == null) {
             // the granularity of system time may be larger than ms, depending on the OS
+            // NOTE: the 2 calls to System.currentTimeMillis() on my Windows machine always returned the same number
             Rand.seedRand(System.currentTimeMillis());
             long seed = System.currentTimeMillis();
             rand = new Random(seed);
         } else {
             BigInteger bi = g.getStartSeed();
             long seed = bi.longValue();   // truncates if necessary
-            Rand.seedRand(seed);
             LangevinLCG langevinLCG = new LangevinLCG(seed);
             for(int i=0; i <= getRunCounter(); i++) {
                 seed = langevinLCG.next();
             }
+            Rand.seedRand(seed);
             rand = new Random(seed);
         }
         System.out.println("in solver, running: " + runCounter);
