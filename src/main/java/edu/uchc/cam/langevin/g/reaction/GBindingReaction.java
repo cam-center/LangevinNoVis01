@@ -103,10 +103,13 @@ public class GBindingReaction {
         double R = type[0].getReactionRadius() + type[1].getReactionRadius();
         // Rescale D so it's in nm^2/s
         double D = 1000000.0 * (type[0].getD() + type[1].getD());
+
+        double rhs1 = 4.0*Math.PI*R*D;
+
         // When a site reacts its own type, the rate should be rescaled to 2*kon
         if(type[0] != type[1]){
-        	if(koff == 0) {
-        		lambda = OnRateSolver.getrootIrreversible(p, R, D, rescalekon);
+        	if(koff == 0) {                                                         // TODO: vol react = 4 pi (R3 - p3) / 3
+        		lambda = OnRateSolver.getrootIrreversible(p, R, D, rescalekon);     // TODO: lambda <-- Kon int / react volume
         	} else {
         		lambda = OnRateSolver.getrootReversible(p, p+bondLength, R, D, rescalekon);
         	}

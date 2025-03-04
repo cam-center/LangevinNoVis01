@@ -157,7 +157,7 @@ public class BindingReactions {
     //  Helper function to add a reaction
     private void addReaction(String key1, String key2, GBindingReaction r, double dt){
         hasReaction.put(key1+key2, Boolean.TRUE);
-        onProbs.put(key1+key2, r.getLambda()*dt);
+        onProbs.put(key1+key2, r.getLambda()*dt);       // TODO: lambda dt -->  1 - e pow(-lambda dt)
         offProbs.put(key1+key2,r.getkoff()*dt);
         reactionNames.put(key1+key2, r.getName());
         bondLengths.put(key1+key2, r.getBondLength());
