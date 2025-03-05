@@ -10,6 +10,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/*
+Bad input, using subdomain name, the solver expects one of the 3 reserved names Extracellular, Intracellular, Membrane
+It categorizes the molecule as Intracellular, which results in failed initial location assignment
+and out of bounds exception for partition index
+MOLECULE: "Anchored" Extracellular_Intracellular_membrane Number 21 Site_Types 5 Total_Sites 5 Total_Links 4 is2D false
+
+The vcell client should generate the line below, which seems to solve the problem
+MOLECULE: "Anchored" Membrane Number 21 Site_Types 5 Total_Sites 5 Total_Links 4 is2D false
+ */
 public class MembraneMoleculeErrorTest {
 
     //             L_z_out: 0.010000000000000009
@@ -32,7 +41,7 @@ public class MembraneMoleculeErrorTest {
 
             *** MOLECULES ***
 
-            MOLECULE: "Anchored" Extracellular_Intracellular_membrane Number 21 Site_Types 5 Total_Sites 5 Total_Links 4 is2D false
+            MOLECULE: "Anchored" Membrane Number 21 Site_Types 5 Total_Sites 5 Total_Links 4 is2D false
             {
                 TYPE: Name "Site0" Radius 1.00000 D 1.000 Color RED STATES "state0"
                 TYPE: Name "Site1" Radius 1.00000 D 1.000 Color BLUE STATES "state0"

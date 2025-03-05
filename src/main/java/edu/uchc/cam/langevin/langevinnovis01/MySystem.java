@@ -663,6 +663,7 @@ public class MySystem {
         for (GMolecule gmol1 : gmols) {
             gmol = gmol1;
             for(int j=0;j<gmol.getNumber();j++){
+                System.out.println("Adding molecule: '" + gmol.getName() + "', instance " + j + " of " + gmol.getNumber());
                 addMolecule(gmol);
             }
         }

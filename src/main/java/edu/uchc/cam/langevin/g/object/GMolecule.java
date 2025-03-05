@@ -97,12 +97,17 @@ public class GMolecule {
         location = i;
     }
     
-    public void setLocation(String loc){
-        for(int i = 0; i < Location.locationName.length;i++){
+    public void setLocation(String loc) {
+        boolean found = false;
+        for(int i = 0; i < Location.locationName.length;i++) {
             if(loc.equals(Location.locationName[i])){
                 location = i;
+                found = true;
                 break;
             }
+        }
+        if(!found) {
+            throw new RuntimeException("Location must be Intracellular, Membrane or Extracellular. Found: '" + loc + "'.");
         }
     }
     
