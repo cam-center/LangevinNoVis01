@@ -7,9 +7,9 @@ import org.apache.commons.csv.CSVRecord;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class LangevinPostprocessor {
@@ -18,6 +18,8 @@ public class LangevinPostprocessor {
     public static final String FULL_COUNT_DATA_CSV = "FullCountData.csv";
     public static final String FULL_STATE_COUNT_DATA_CSV = "FullStateCountData.csv";
     public static final String SITE_PROPERTY_DATA_CSV__NOT_USED_ = "SitePropertyData.csv";
+    public static final String MOLECULE_IDS_CSV = "MoleculeIDs.csv";
+    public static final String CLUSTERS_TIME_PREFIX = "Clusters_Time_";
 
     /**
      * Converts Langevin's output to a singular .IDA file in dir
@@ -34,7 +36,6 @@ public class LangevinPostprocessor {
              //FileReader sitePropertyDataReader = new FileReader(langevinOutputDir + SITE_PROPERTY_DATA_CSV);
              //FileReader clustersTimeReader = new FileReader(langevinOutputDir + "Clusters_Time_.csv")
         ) {
-
             CSVParser fullBondData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullBondDataReader);
             CSVParser fullCountData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullCountDataReader);
             CSVParser fullStateCountData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullStateCountDataReader);
@@ -114,7 +115,90 @@ public class LangevinPostprocessor {
                 }
                 csvPrinter.flush();
             }
+
+            //
+            // ==================================================================================================================
+            //
+            List<ClusterInfo> clusterInfoList = new ArrayList<>();
+            Map<String, Integer> molecules = getMolecules(langevinOutputDir);
+
+            File[] files = langevinOutputDir.toFile().listFiles((dir, name) -> name.startsWith(CLUSTERS_TIME_PREFIX) && name.endsWith(".csv"));
+            if (files != null) {
+                Integer timePointIndex = 0;
+                for (File file : files) {
+                    System.out.println(" ---------------------- " + file.getName());
+                    int startIndex = file.getName().lastIndexOf("_") + 1; // After the first underscore
+                    int endIndex = file.getName().lastIndexOf("."); // Before the ".csv"
+                    String numericPart = file.getName().substring(startIndex, endIndex);
+                    double time = Double.parseDouble(numericPart);
+                    boolean hasNonTrivialClusters = false;
+
+                    try (FileReader clustersTimeReader = new FileReader(file);
+                         BufferedReader reader = new BufferedReader(clustersTimeReader);
+                    ) {
+                        String line;
+                        int totalClusters = 0;
+                        while ((line = reader.readLine()) != null) {
+                            line = line.trim();
+                            if (line.startsWith("Total clusters")) {
+                                totalClusters = Integer.parseInt(line.split(",")[1].trim());
+                            } else if (line.startsWith("Cluster Index")) {
+                                ClusterInfo ci = new ClusterInfo();
+                                ci.timePointIndex = timePointIndex;
+                                ci.time = time;
+                                hasNonTrivialClusters = true;   // found at least a cluster
+                                String[] clusterIndexParts = line.split(",");
+                                ci.clusterIndex = Integer.parseInt(clusterIndexParts[1].trim());
+                                while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
+                                    String[] parts = line.split(",");
+                                    if(parts[0].trim().equals("Size")) {
+                                        ci.size = Integer.parseInt(parts[1].trim());
+                                    } else {
+                                        ci.clusterComponents.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
+                                    }
+                                }
+                                clusterInfoList.add(ci);
+                                System.out.println("Parsed Cluster  " + ci.clusterIndex);
+                            }
+                        }
+                    }
+                    if(!hasNonTrivialClusters) {    // only trivial clusters, we save an empty ClusterInfo object
+                        ClusterInfo ci = new ClusterInfo();
+                        ci.timePointIndex = timePointIndex;
+                        ci.time = time;
+                        clusterInfoList.add(ci);
+                    }
+                    timePointIndex++;
+                }
+                System.out.println("Done all files");
+            }
         }
+    }
+
+    static class ClusterInfo {  // info on non-trivial cluster (2 molecules or more)
+        int timePointIndex = -1;
+        double time = -1.0;
+        int clusterIndex = -1;
+        int size = 0;
+        Map<String, Integer> clusterComponents = new LinkedHashMap<>(); // key = molecule name, value = number of molecules in the cluster
+    }
+
+    private static Map<String, Integer> getMolecules(Path langevinOutputDir) throws IOException {
+        File file = new File(langevinOutputDir.toFile(), MOLECULE_IDS_CSV);
+        Map<String, Integer> occurrences = new LinkedHashMap<>();
+        Map<String, Integer> sortedOccurrences = new LinkedHashMap<>(); // key = molecule name, value = number of molecules
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length == 2) {
+                    String key = parts[1].trim();
+                    occurrences.put(key, occurrences.getOrDefault(key, 0) + 1);
+                }
+            }
+            occurrences.keySet().stream().sorted().forEach(key -> sortedOccurrences.put(key, occurrences.get(key)));
+        }
+        return sortedOccurrences;
     }
 
 	public ArrayList<String> readClustersToArray_NOT_USED_(String path) throws FileNotFoundException {
