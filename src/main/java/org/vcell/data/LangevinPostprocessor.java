@@ -5,6 +5,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
@@ -63,7 +64,7 @@ public class LangevinPostprocessor {
             headers.addAll(fullStateCountHeaders.stream().filter(s -> !s.equals("Time")).toList());
             //headers.addAll(sitePropertyHeaders.stream().filter(s -> !s.equals("Time")).toList());
             //headers.addAll(clustersTimeHeaders.stream().filter(s -> !s.equals("Time")).toList());
-            List<String> combined_headers = headers.stream().map(s -> s.replace(" ", "_").replace(":","")).toList();
+            List<String> combined_headers = headers.stream().map(s -> s.replace(" ", "_").replace(":", "")).toList();
 
 
             try (FileWriter writer = new FileWriter(idaFile.toFile().getAbsoluteFile(), false)) {
@@ -90,7 +91,7 @@ public class LangevinPostprocessor {
 
                     // skip the rest of the rows if padded with zero times (an artifact of the way the data is written)
                     double time = fullBondDataRecord.get(0) != null ? Double.parseDouble(fullBondDataRecord.get(0)) : 0.0;
-                    if (!bFirstRow && time == 0.0){
+                    if (!bFirstRow && time == 0.0) {
                         break;
                     }
                     bFirstRow = false;
@@ -115,23 +116,27 @@ public class LangevinPostprocessor {
                 }
                 csvPrinter.flush();
             }
+        }
+    }
 
-            //
-            // ==================================================================================================================
-            //
-            List<ClusterInfo> clusterInfoList = new ArrayList<>();
+        //
+        // ==================================================================================================================
+        //
+        public static void writeClustersFile(Path langevinOutputDir, Path clustersFile) throws IOException {
+
+            Map<Double, TimePointClustersInfo> clusterInfoMap = new LinkedHashMap<>();
             Map<String, Integer> molecules = getMolecules(langevinOutputDir);
 
             File[] files = langevinOutputDir.toFile().listFiles((dir, name) -> name.startsWith(CLUSTERS_TIME_PREFIX) && name.endsWith(".csv"));
             if (files != null) {
-                Integer timePointIndex = 0;
                 for (File file : files) {
                     System.out.println(" ---------------------- " + file.getName());
                     int startIndex = file.getName().lastIndexOf("_") + 1; // After the first underscore
                     int endIndex = file.getName().lastIndexOf("."); // Before the ".csv"
                     String numericPart = file.getName().substring(startIndex, endIndex);
                     double time = Double.parseDouble(numericPart);
-                    boolean hasNonTrivialClusters = false;
+                    TimePointClustersInfo timePointClustersInfo = new TimePointClustersInfo();
+                    clusterInfoMap.put(time, timePointClustersInfo);
 
                     try (FileReader clustersTimeReader = new FileReader(file);
                          BufferedReader reader = new BufferedReader(clustersTimeReader);
@@ -142,11 +147,9 @@ public class LangevinPostprocessor {
                             line = line.trim();
                             if (line.startsWith("Total clusters")) {
                                 totalClusters = Integer.parseInt(line.split(",")[1].trim());
+                                timePointClustersInfo.timePointTotalClusters = totalClusters;
                             } else if (line.startsWith("Cluster Index")) {
                                 ClusterInfo ci = new ClusterInfo();
-                                ci.timePointIndex = timePointIndex;
-                                ci.time = time;
-                                hasNonTrivialClusters = true;   // found at least a cluster
                                 String[] clusterIndexParts = line.split(",");
                                 ci.clusterIndex = Integer.parseInt(clusterIndexParts[1].trim());
                                 while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
@@ -157,29 +160,41 @@ public class LangevinPostprocessor {
                                         ci.clusterComponents.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
                                     }
                                 }
-                                clusterInfoList.add(ci);
+                                timePointClustersInfo.timePointClusterInfoList.add(ci);
                                 System.out.println("Parsed Cluster  " + ci.clusterIndex);
                             }
                         }
                     }
-                    if(!hasNonTrivialClusters) {    // only trivial clusters, we save an empty ClusterInfo object
-                        ClusterInfo ci = new ClusterInfo();
-                        ci.timePointIndex = timePointIndex;
-                        ci.time = time;
-                        clusterInfoList.add(ci);
-                    }
-                    timePointIndex++;
                 }
                 System.out.println("Done all files");
             }
-        }
-    }
 
-    static class ClusterInfo {  // info on non-trivial cluster (2 molecules or more)
-        int timePointIndex = -1;
-        double time = -1.0;
+            String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
+            NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, langevinOutputDir, clustersFileName);
+            Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(langevinOutputDir, clustersFileName);
+
+        }
+
+
+    static class TimePointClustersInfo implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        @JsonProperty("timePointTotalClusters")
+        int timePointTotalClusters;                     // total clusters at this timepoint (trivial + non-trivial)
+
+        @JsonProperty("timePointClusterInfoList")
+        List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
+    }
+    static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
+        private static final long serialVersionUID = 1L;
+
+        @JsonProperty("clusterIndex")
         int clusterIndex = -1;
+
+        @JsonProperty("size")
         int size = 0;
+
+        @JsonProperty("clusterComponents")
         Map<String, Integer> clusterComponents = new LinkedHashMap<>(); // key = molecule name, value = number of molecules in the cluster
     }
 
