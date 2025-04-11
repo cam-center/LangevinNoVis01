@@ -156,15 +156,27 @@ public class BindingReactions {
     
     //  Helper function to add a reaction
     private void addReaction(String key1, String key2, GBindingReaction r, double dt){
+
+        double onProbOld = r.getLambda()*dt;
+        double onProbNew = 1.0 - Math.pow(Math.E, -(r.lambdaNew*dt));       // lambda dt -->  1 - e pow(-lambda dt)
+        double offProbOld = r.getkoff()*dt;
+        double offProbNew = 1.0 - Math.pow(Math.E, -(r.kOffIntrinsic*dt));
+        System.out.println("onProbability: " + onProbOld + ", " + onProbNew);
+        System.out.println("offProbability: " + offProbOld + ", " + offProbNew);
+
         hasReaction.put(key1+key2, Boolean.TRUE);
-        onProbs.put(key1+key2, r.getLambda()*dt);       // TODO: lambda dt -->  1 - e pow(-lambda dt)
-        offProbs.put(key1+key2,r.getkoff()*dt);
+        // onProbs.put(key1+key2, r.getLambda()*dt);
+        onProbs.put(key1+key2, onProbNew);
+//        offProbs.put(key1+key2,r.getkoff()*dt);
+        offProbs.put(key1+key2,offProbNew);
         reactionNames.put(key1+key2, r.getName());
         bondLengths.put(key1+key2, r.getBondLength());
         
         hasReaction.put(key2+key1, Boolean.TRUE);
-        onProbs.put(key2+key1, r.getLambda()*dt);
-        offProbs.put(key2+key1,r.getkoff()*dt);
+//        onProbs.put(key2+key1, r.getLambda()*dt);
+        onProbs.put(key2+key1, onProbNew);
+//        offProbs.put(key2+key1,r.getkoff()*dt);
+        offProbs.put(key2+key1,offProbNew);
         reactionNames.put(key2+key1, r.getName());
         bondLengths.put(key2+key1, r.getBondLength());
     }

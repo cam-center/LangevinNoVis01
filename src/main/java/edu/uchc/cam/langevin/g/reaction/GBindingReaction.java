@@ -26,10 +26,12 @@ public class GBindingReaction {
     private final GSiteType [] type = new GSiteType[2];
     private final GState [] state = new GState[2];
     
-    private double kon = 0; // Units uM-1.s-1
-    private double lambda = 0; // Units s-1. This is the rate used to actually compute the probability of reacting.
-    private double koff = 0;  // Units s-1.  This is given directly to the bond.
-    
+    private double kon = 0.0; // Units uM-1.s-1
+    private double lambdaOld = 0.0; // Units s-1. This is the rate used to actually compute the probability of reacting.
+    public double lambdaNew = 0.0;
+    private double koff = 0.0;  // Units s-1.  This is given directly to the bond.
+    public double kOffIntrinsic = 0.0;
+
     private double bondLength = 0.5; // Units nm
     
     public final static String ANY_STATE_STRING = "Any_State";
@@ -93,7 +95,7 @@ public class GBindingReaction {
     }
     
     public double getLambda(){
-        return lambda;
+        return lambdaNew;
     }
     
     private void setLambda(){
@@ -101,27 +103,39 @@ public class GBindingReaction {
         double rescalekon = kon*1660000.0;
         double p = type[0].getRadius() + type[1].getRadius();
         double R = type[0].getReactionRadius() + type[1].getReactionRadius();
-        // Rescale D so it's in nm^2/s
+        // Rescale site type diffusion rate D so it's in nm^2/s (from um^2/s)
         double D = 1000000.0 * (type[0].getD() + type[1].getD());
 
-        double rhs1 = 4.0*Math.PI*R*D;
-
+        // old formula, will keep the code for now, just in case
         // When a site reacts its own type, the rate should be rescaled to 2*kon
         if(type[0] != type[1]){
-        	if(koff == 0) {                                                         // TODO: vol react = 4 pi (R3 - p3) / 3
-        		lambda = OnRateSolver.getrootIrreversible(p, R, D, rescalekon);     // TODO: lambda <-- Kon int / react volume
+        	if(koff == 0) {
+                lambdaOld = OnRateSolver.getrootIrreversible(p, R, D, rescalekon);
         	} else {
-        		lambda = OnRateSolver.getrootReversible(p, p+bondLength, R, D, rescalekon);
+                lambdaOld = OnRateSolver.getrootReversible(p, p+bondLength, R, D, rescalekon);
         	}
         } else {
         	if(koff == 0) {
-        		lambda = OnRateSolver.getrootIrreversible(p, R, D, 2*rescalekon);
+                lambdaOld = OnRateSolver.getrootIrreversible(p, R, D, 2.0 * rescalekon);
         	} else {
-        		lambda = OnRateSolver.getrootReversible(p, p+bondLength, R, D, 2*rescalekon);
+                lambdaOld = OnRateSolver.getrootReversible(p, p+bondLength, R, D, 2.0 * rescalekon);
         	}
         }
-        // System.out.println("Called setLambda.  Lambda = " + lambda);
-        
+
+        // ----------------------------------------------------------------------------------------
+        if(type[0] == type[1]) {
+            rescalekon *= 2.0;
+        }
+        double volReact = 4.0 * Math.PI * (Math.pow(R,3) - Math.pow(p,3)) / 3.0;    // R=reaction radius, p=site radius
+        double kD = 4 * Math.PI * R * D;        // R=reaction radius, D=diffusion rate
+        double kOnIntrinsic = (rescalekon * kD) / (kD - rescalekon);    // may be negative, we take the abs value
+        if(kOnIntrinsic <= 0.0) {
+            throw new RuntimeException("Kon is too large");
+        }
+        lambdaNew = kOnIntrinsic / volReact;
+        System.out.println("Called setLambda.  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
+
+        kOffIntrinsic = koff * kOnIntrinsic / rescalekon;
     }
     
     public double getBondLength(){
@@ -235,8 +249,8 @@ public class GBindingReaction {
         // MUST SET LAMBDA HERE.  I FORGOT TO DO THIS AT FIRST!
         setLambda();
         // If lambda*dt is too big give a warning.
-        if(lambda*g.getdt() > 0.05){
-            System.out.println("WARNING: lambda*dt = " + lambda*g.getdt() + "."
+        if(lambdaOld*g.getdt() > 0.05){
+            System.out.println("WARNING: lambda*dt = " + lambdaOld*g.getdt() + "."
                     + " For accurate results you want lambda*dt << 0.01.");
         }
         // </editor-fold>
