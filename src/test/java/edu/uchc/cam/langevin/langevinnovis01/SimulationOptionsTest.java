@@ -177,11 +177,14 @@ public class SimulationOptionsTest {
 
         double[] kon = {0.05, 0.1, 0.5, 1.0, 5.0, 10.0 , 40.0};    // uM^-1 * s^-1
 //        double[] kon = { 5.0, 10.0 , 15.0, 20.0, 25.0, 30.0, 35.0, 40.0};    // uM^-1 * s^-1
-        double koff = 23.0;
+        double koff = 25.0;
         double[] dt = { 1.0E-9, 5.0E-9, 1.0E-8, 5.0E-8 };
 
         String[] relativeLambdaErrorExpected = { "0.01", "0.02", "0.12", "0.24", "1.32", "2.99", "55.65"};
         String[] relativeLambdaErrorCalculated = new String[kon.length];
+
+        String relativeOffProbabilityErrorExpected = "2.25";
+        String relativeOffProbabilityErrorCalculated = "-1.0";
 
         double siteRadius1 = 1.0;       // nm
         double siteRadius2 = 1.0;
@@ -204,17 +207,20 @@ public class SimulationOptionsTest {
             double rescalekon = kon[i] * 1660000.0;
             double lambdaOld = OnRateSolver.getrootIrreversible(p, R, D, rescalekon);
             double lambdaNew = getLambdaNew(p, R, D, rescalekon);
-            double relativeError1 = Math.abs((lambdaOld - lambdaNew) / lambdaOld * 100);
+            double relativeError1 = Math.abs((lambdaOld - lambdaNew) / lambdaOld * 100.0);
             String adjustedRelativeLambdaError = adjust(relativeError1);
             relativeLambdaErrorCalculated[i] = adjustedRelativeLambdaError;
-            System.out.println(kon[i] + ": " + adjustedRelativeLambdaError + "%");
+//            System.out.println(kon[i] + ": " + adjustedRelativeLambdaError + "%");
 
-            // TODO: !!! compute off rates the old way and the new way (with koff intrinsic)
+            // compute off rates the old way and the new way (with koff intrinsic)
             double offProbOld = koff*dt[3];
             double kOffIntrinsic = getKOffIntrinsic(R, D, koff, rescalekon);
             double offProbNew = 1.0 - Math.pow(Math.E, -(kOffIntrinsic*dt[3]));
-            double relativeError = Math.abs((offProbOld - offProbNew) / offProbOld * 100);
-            System.out.println("  --- offProb relative error: " + relativeError + "%");
+            double relativeError = Math.abs((offProbOld - offProbNew) / offProbOld * 100.0);
+            if(i==3) {      // compute only one relative error for off probability rate based on credible numbers
+                relativeOffProbabilityErrorCalculated = adjust(relativeError);
+            }
+//            System.out.println("  --- offProb relative error: " + relativeError + "%");
 
 
             // compute error over a range of dt, using the old vs new formula
@@ -229,6 +235,7 @@ public class SimulationOptionsTest {
 //            System.out.println("");
         }
         Assertions.assertTrue(Arrays.equals(relativeLambdaErrorExpected, relativeLambdaErrorCalculated));
+        Assertions.assertTrue(relativeOffProbabilityErrorExpected.equals(relativeOffProbabilityErrorCalculated));
     }
 
     private static double getLambdaNew(double p, double R, double D, double rescalekon) {
@@ -266,9 +273,7 @@ public class SimulationOptionsTest {
         } else {
             formattedNumber = standardFormat.format(number);
         }
-
         return(formattedNumber);
-
     }
 
     }
