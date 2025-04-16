@@ -1142,7 +1142,18 @@ public class MySystem {
         String idaFileExtension = ".ida";
         String clustersFileExtension = ".json";
         String inputFileExtension = inputFile.getName().substring(inputFile.getName().lastIndexOf("."));
-        File idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, idaFileExtension));
+
+        File idaFile;
+        if(getRunCounter() == 0) {
+            // we allow the ida file for run 0 to stay without run count suffix
+            idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, idaFileExtension));
+        } else {
+            // for run counts > 0 we add run count suffix
+            String parentDirectory = inputFile.getParent();
+            String fileNameWithoutExtension = inputFile.getName().split("\\.")[0];
+            String newFileName = fileNameWithoutExtension + "_" + getRunCounter() + idaFileExtension;
+            idaFile = new File(parentDirectory, newFileName);
+        }
         LangevinPostprocessor.writeIdaFile(dataFolder.toPath(),idaFile.toPath());
         File clustersFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, clustersFileExtension));
         LangevinPostprocessor.writeClustersFile(dataFolder.toPath(),clustersFile.toPath());
