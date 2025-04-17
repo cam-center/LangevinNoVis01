@@ -276,8 +276,14 @@ public class MySystem {
         String filePath = inputFile.getAbsolutePath();
         // Strip the file name off of the path
         filePath = filePath.substring(0,filePath.length()-fileName.length());
-        // Strip ".txt" off the file name
-        fileName = fileName.substring(0,fileName.length()-4);
+        // Strip extension off the file name
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            fileName = fileName.substring(0, dotIndex);
+        } else {
+            System.out.println("Expected an extension for the input file: " + fileName);
+        }
+
         /* Check to see if the file is already in a folder named fileName_FOLDER
          * If it is, then we set folder to this folder. If it is not, then
          * we make this folder and we make a copy of the file in that folder.
@@ -1144,18 +1150,21 @@ public class MySystem {
         String inputFileExtension = inputFile.getName().substring(inputFile.getName().lastIndexOf("."));
 
         File idaFile;
+        File clustersFile;
         if(getRunCounter() == 0) {
             // we allow the ida file for run 0 to stay without run count suffix
             idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, idaFileExtension));
+            clustersFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, clustersFileExtension));
         } else {
             // for run counts > 0 we add run count suffix
             String parentDirectory = inputFile.getParent();
             String fileNameWithoutExtension = inputFile.getName().split("\\.")[0];
-            String newFileName = fileNameWithoutExtension + "_" + getRunCounter() + idaFileExtension;
-            idaFile = new File(parentDirectory, newFileName);
+            String newIdaFileName = fileNameWithoutExtension + "_" + getRunCounter() + idaFileExtension;
+            idaFile = new File(parentDirectory, newIdaFileName);
+            String newClustersFileName = fileNameWithoutExtension + "_" + getRunCounter() + clustersFileExtension;
+            clustersFile = new File(parentDirectory, newClustersFileName);
         }
         LangevinPostprocessor.writeIdaFile(dataFolder.toPath(),idaFile.toPath());
-        File clustersFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, clustersFileExtension));
         LangevinPostprocessor.writeClustersFile(dataFolder.toPath(),clustersFile.toPath());
         vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(1.0, time));
         vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, time));

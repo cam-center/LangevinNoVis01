@@ -170,9 +170,10 @@ public class LangevinPostprocessor {
             }
 
             String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
-            NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, langevinOutputDir, clustersFileName);
-            Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(langevinOutputDir, clustersFileName);
+            NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, clustersFile);
 
+            // check loader. move this to a test
+            Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile);
         }
 
 

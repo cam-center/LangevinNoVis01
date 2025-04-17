@@ -11,10 +11,10 @@ import java.util.Map;
 public class NdJsonUtils {
 
     public static void saveClusterInfoMapToNDJSON(Map<Double, LangevinPostprocessor.TimePointClustersInfo> clusterInfoMap,
-                Path langevinOutputDir, String clustersFileName) throws IOException {
+                Path clustersFile) throws IOException {
 
         ObjectMapper objectMapper = new ObjectMapper();
-        try (FileWriter writer = new FileWriter(new File(langevinOutputDir.toFile(), clustersFileName))) {
+        try (FileWriter writer = new FileWriter(clustersFile.toFile().getAbsoluteFile(), false)) {
             for (Map.Entry<Double, LangevinPostprocessor.TimePointClustersInfo> entry : clusterInfoMap.entrySet()) {
                 // Create an object to serialize
                 Map<String, Object> ndjsonObject = new LinkedHashMap<>();
@@ -25,15 +25,14 @@ public class NdJsonUtils {
                 writer.write(objectMapper.writeValueAsString(ndjsonObject) + "\n");
             }
         }
-        System.out.println("Data successfully saved to NDJSON file: " + clustersFileName);
+        System.out.println("Data successfully saved to NDJSON file: " + clustersFile.toFile().getAbsoluteFile().getName());
     }
 
-    public static Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadClusterInfoMapFromNDJSON(
-            Path langevinOutputDir, String clustersFileName) throws IOException {
+    public static Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadClusterInfoMapFromNDJSON(Path clustersFile) throws IOException {
 
         ObjectMapper objectMapper = new ObjectMapper();
         Map<Double, LangevinPostprocessor.TimePointClustersInfo> clusterInfoMap = new LinkedHashMap<>();
-        try (FileReader clustersFileReader = new FileReader(new File(langevinOutputDir.toFile(), clustersFileName));
+        try (FileReader clustersFileReader = new FileReader(clustersFile.toFile().getAbsoluteFile());
              BufferedReader reader = new BufferedReader(clustersFileReader);
         ) {
             String line;
@@ -50,7 +49,7 @@ public class NdJsonUtils {
                 clusterInfoMap.put(timePoint, timePointClustersInfo);
             }
         }
-        System.out.println("Data successfully loaded from NDJSON file: " + clustersFileName);
+        System.out.println("Data successfully loaded from NDJSON file: " + clustersFile.toFile().getAbsoluteFile().getName());
         return clusterInfoMap;
     }
 
