@@ -16,8 +16,8 @@ public class PostCommand implements Callable<Integer> {
     @CommandLine.Parameters(description = "Langevin model file", index = "0", type = File.class)
     private File modelFile = null;
 
-    @CommandLine.Parameters(description = "run counter", index = "1", type = Integer.class)
-    private Integer runCounter = null;
+    @CommandLine.Parameters(description = "num runs", index = "1", type = Integer.class)
+    private Integer numRuns = null;
 
     @CommandLine.Option(names = {"--output-log"}, required = false, type = File.class, description = "output log file")
     private File logFile = null;
@@ -73,13 +73,13 @@ public class PostCommand implements Callable<Integer> {
         }
         if (logFile == null) {
             g = new Global(modelFile);
-            sys = new MySystem(g, runCounter, false, vcellMessaging);
+//            sys = new MySystem(g, runCounter, false, vcellMessaging);
         } else {
             g = new Global(modelFile, logFile);
-            sys = new MySystem(g, runCounter, true, vcellMessaging);
+//            sys = new MySystem(g, runCounter, true, vcellMessaging);
         }
 
-        sys.runSystem();
+//        sys.runSystem();
         // g.writeData("AlloInputData.txt");
         return 0;
     }

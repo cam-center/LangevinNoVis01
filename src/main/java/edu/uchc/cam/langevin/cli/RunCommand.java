@@ -17,7 +17,7 @@ public class RunCommand implements Callable<Integer> {
     private File modelFile = null;
 
     @CommandLine.Parameters(description = "run counter", index = "1", type = Integer.class)
-    private Integer runCounter = null;
+    private Integer runCounter = null;      // we always start with run 0 (the solver does special things only during run 0, like the movie data)
 
     @CommandLine.Option(names = {"--output-log"}, required = false, type = File.class, description = "output log file")
     private File logFile = null;

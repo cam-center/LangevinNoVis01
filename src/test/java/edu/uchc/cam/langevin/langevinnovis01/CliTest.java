@@ -129,11 +129,11 @@ public class CliTest {
     @Test
     public void testRunCommand() throws IOException {
 
-//        Path parentFolder = Paths.get(parent_dir);
-//        Path tempDirectory = parentFolder.resolve("test_simulation");   // use a convenient location for debugging
-//        Files.createDirectories(tempDirectory);
+        Path parentFolder = Paths.get(parent_dir);
+        Path tempDirectory = parentFolder.resolve(temp_dir_name);   // use a convenient location for debugging
+        Files.createDirectories(tempDirectory);
 
-        Path tempDirectory = Files.createTempDirectory(temp_dir_name);        // correct temp location for automatic testing
+//        Path tempDirectory = Files.createTempDirectory(temp_dir_name);        // correct temp location for automatic testing
         Path modelFile = tempDirectory.resolve(sim_base_name+".langevinInput");
         Path logFile = tempDirectory.resolve(sim_base_name+".log");
         Path idaFile_0 = tempDirectory.resolve(sim_base_name+".ida");
@@ -177,7 +177,7 @@ public class CliTest {
 
         } finally {
             // uncomment this for automatic run
-            deleteDirectory(tempDirectory.toFile());
+//            deleteDirectory(tempDirectory.toFile());
             System.out.println("finally!");
         }
     }
