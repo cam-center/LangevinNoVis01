@@ -65,7 +65,7 @@ public class SimulationOptionsTest {
             
             *** BIMOLECULAR BINDING REACTIONS ***
             
-            'r1'       'MT0' : 'Site0' : 'Any_State'  +  'MT0' : 'Site0' : 'Any_State'  kon  100.0  koff 0.0  Bond_Length 1.0
+            'r1'       'MT0' : 'Site0' : 'Any_State'  +  'MT0' : 'Site0' : 'Any_State'  kon  10.0  koff 0.0  Bond_Length 1.0
             
             *** MOLECULE COUNTERS ***
             
