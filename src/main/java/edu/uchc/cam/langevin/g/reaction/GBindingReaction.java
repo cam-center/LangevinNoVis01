@@ -248,11 +248,11 @@ public class GBindingReaction {
         
         // MUST SET LAMBDA HERE.  I FORGOT TO DO THIS AT FIRST!
         setLambda();
-        // If lambda*dt is too big give a warning.
-        if(lambdaOld*g.getdt() > 0.05){
-            System.out.println("WARNING: lambda*dt = " + lambdaOld*g.getdt() + "."
-                    + " For accurate results you want lambda*dt << 0.01.");
-        }
+//        // If lambda*dt is too big give a warning.
+//        if(lambdaOld*g.getdt() > 0.05){
+//            System.out.println("WARNING: lambda*dt = " + lambdaOld*g.getdt() + "."
+//                    + " For accurate results you want lambda*dt << 0.01.");
+//        }
         // </editor-fold>
     }
     
