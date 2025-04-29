@@ -5,11 +5,12 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.*;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class LangevinPostprocessor {
@@ -18,6 +19,8 @@ public class LangevinPostprocessor {
     public static final String FULL_COUNT_DATA_CSV = "FullCountData.csv";
     public static final String FULL_STATE_COUNT_DATA_CSV = "FullStateCountData.csv";
     public static final String SITE_PROPERTY_DATA_CSV__NOT_USED_ = "SitePropertyData.csv";
+    public static final String MOLECULE_IDS_CSV = "MoleculeIDs.csv";
+    public static final String CLUSTERS_TIME_PREFIX = "Clusters_Time_";
 
     /**
      * Converts Langevin's output to a singular .IDA file in dir
@@ -34,7 +37,6 @@ public class LangevinPostprocessor {
              //FileReader sitePropertyDataReader = new FileReader(langevinOutputDir + SITE_PROPERTY_DATA_CSV);
              //FileReader clustersTimeReader = new FileReader(langevinOutputDir + "Clusters_Time_.csv")
         ) {
-
             CSVParser fullBondData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullBondDataReader);
             CSVParser fullCountData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullCountDataReader);
             CSVParser fullStateCountData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullStateCountDataReader);
@@ -62,7 +64,7 @@ public class LangevinPostprocessor {
             headers.addAll(fullStateCountHeaders.stream().filter(s -> !s.equals("Time")).toList());
             //headers.addAll(sitePropertyHeaders.stream().filter(s -> !s.equals("Time")).toList());
             //headers.addAll(clustersTimeHeaders.stream().filter(s -> !s.equals("Time")).toList());
-            List<String> combined_headers = headers.stream().map(s -> s.replace(" ", "_").replace(":","")).toList();
+            List<String> combined_headers = headers.stream().map(s -> s.replace(" ", "_").replace(":", "")).toList();
 
 
             try (FileWriter writer = new FileWriter(idaFile.toFile().getAbsoluteFile(), false)) {
@@ -89,7 +91,7 @@ public class LangevinPostprocessor {
 
                     // skip the rest of the rows if padded with zero times (an artifact of the way the data is written)
                     double time = fullBondDataRecord.get(0) != null ? Double.parseDouble(fullBondDataRecord.get(0)) : 0.0;
-                    if (!bFirstRow && time == 0.0){
+                    if (!bFirstRow && time == 0.0) {
                         break;
                     }
                     bFirstRow = false;
@@ -117,34 +119,132 @@ public class LangevinPostprocessor {
         }
     }
 
-	public ArrayList<String> readClustersToArray_NOT_USED_(String path) throws FileNotFoundException {
+    //
+    // ==================================================================================================================
+    //
+    public static void writeClustersFile(Path langevinOutputDir, Path clustersFile) throws IOException {
 
-		File full = new File(path);
-		File dir = new File(full.getParent());
-		ArrayList<String> array = new ArrayList<>();
+        Map<Double, TimePointClustersInfo> clusterInfoMap = new LinkedHashMap<>();
+        Map<String, Integer> molecules = getMolecules(langevinOutputDir);
 
-		String[] file_paths = dir.list();
-		for (String f: file_paths) {
-			if (f.contains("Clusters_Time_")) {
-				try(Scanner scanner = new Scanner(new File(dir, f))) {
-					while (scanner.hasNextLine()) {
-						String line = scanner.nextLine();
-						line = line.replace(",",":");
-						int index = line.indexOf(":");
-						if (!(line.equals(""))) {
-							if (array.size() < 1) {
-								array.add(line.substring(0, index).replace(" ", "_")); //
-								array.add(line.substring(index + 1).trim());
-							} else {
-								array.add(line.substring(index + 1));
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-		return array;
-	}
+        File[] files = langevinOutputDir.toFile().listFiles((dir, name) -> name.startsWith(CLUSTERS_TIME_PREFIX) && name.endsWith(".csv"));
+        if (files != null) {
+            for (File file : files) {
+                System.out.println(" ---------------------- " + file.getName());
+                int startIndex = file.getName().lastIndexOf("_") + 1; // After the first underscore
+                int endIndex = file.getName().lastIndexOf("."); // Before the ".csv"
+                String numericPart = file.getName().substring(startIndex, endIndex);
+                double time = Double.parseDouble(numericPart);
+                TimePointClustersInfo timePointClustersInfo = new TimePointClustersInfo();
+                clusterInfoMap.put(time, timePointClustersInfo);
+
+                try (FileReader clustersTimeReader = new FileReader(file);
+                     BufferedReader reader = new BufferedReader(clustersTimeReader);
+                ) {
+                    String line;
+                    int totalClusters = 0;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.startsWith("Total clusters")) {
+                            totalClusters = Integer.parseInt(line.split(",")[1].trim());
+                            timePointClustersInfo.timePointTotalClusters = totalClusters;
+                        } else if (line.startsWith("Cluster Index")) {
+                            ClusterInfo ci = new ClusterInfo();
+                            String[] clusterIndexParts = line.split(",");
+                            ci.clusterIndex = Integer.parseInt(clusterIndexParts[1].trim());
+                            while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
+                                String[] parts = line.split(",");
+                                if(parts[0].trim().equals("Size")) {
+                                    ci.size = Integer.parseInt(parts[1].trim());
+                                } else {
+                                    ci.clusterComponents.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
+                                }
+                            }
+                            timePointClustersInfo.timePointClusterInfoList.add(ci);
+                            System.out.println("Parsed Cluster  " + ci.clusterIndex);
+                        }
+                    }
+                }
+            }
+            System.out.println("Done all files");
+        }
+
+        String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
+        NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, clustersFile);
+
+        // check loader. move this to a test
+        Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile);
+    }
+
+
+    static class TimePointClustersInfo implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        @JsonProperty("timePointTotalClusters")
+        int timePointTotalClusters;                     // total clusters at this timepoint (trivial + non-trivial)
+
+        @JsonProperty("timePointClusterInfoList")
+        List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
+    }
+    static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
+        private static final long serialVersionUID = 1L;
+
+        @JsonProperty("clusterIndex")
+        int clusterIndex = -1;
+
+        @JsonProperty("size")
+        int size = 0;
+
+        @JsonProperty("clusterComponents")
+        Map<String, Integer> clusterComponents = new LinkedHashMap<>(); // key = molecule name, value = number of molecules in the cluster
+    }
+
+    private static Map<String, Integer> getMolecules(Path langevinOutputDir) throws IOException {
+        File file = new File(langevinOutputDir.toFile(), MOLECULE_IDS_CSV);
+        Map<String, Integer> occurrences = new LinkedHashMap<>();
+        Map<String, Integer> sortedOccurrences = new LinkedHashMap<>(); // key = molecule name, value = number of molecules
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length == 2) {
+                    String key = parts[1].trim();
+                    occurrences.put(key, occurrences.getOrDefault(key, 0) + 1);
+                }
+            }
+            occurrences.keySet().stream().sorted().forEach(key -> sortedOccurrences.put(key, occurrences.get(key)));
+        }
+        return sortedOccurrences;
+    }
+
+    public ArrayList<String> readClustersToArray_NOT_USED_(String path) throws FileNotFoundException {
+
+        File full = new File(path);
+        File dir = new File(full.getParent());
+        ArrayList<String> array = new ArrayList<>();
+
+        String[] file_paths = dir.list();
+        for (String f: file_paths) {
+            if (f.contains("Clusters_Time_")) {
+                try(Scanner scanner = new Scanner(new File(dir, f))) {
+                    while (scanner.hasNextLine()) {
+                        String line = scanner.nextLine();
+                        line = line.replace(",",":");
+                        int index = line.indexOf(":");
+                        if (!(line.equals(""))) {
+                            if (array.size() < 1) {
+                                array.add(line.substring(0, index).replace(" ", "_")); //
+                                array.add(line.substring(index + 1).trim());
+                            } else {
+                                array.add(line.substring(index + 1));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return array;
+    }
 
 }

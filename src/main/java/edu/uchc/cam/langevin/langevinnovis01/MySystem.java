@@ -37,8 +37,8 @@ public class MySystem {
     // Source of the global variables
     Global g;
     Random rand;
-    
-    // Arrays of molecules, sites, links, and bonds. 
+
+    // Arrays of molecules, sites, links, and bonds.
     private final ArrayList<Molecule> molecules = new ArrayList<>();
     private final ArrayList<Site> sites = new ArrayList<>();
     private final ArrayList<Link> links = new ArrayList<>();
@@ -48,19 +48,19 @@ public class MySystem {
     // this allows us to use time steps ~ 1-100 ns for biologically relevant diffusion coefficients
     // (where k_B is the Boltzmann constant, T is an absolute temperature, k is the spring constant)
     public final static int SpringConstant = 100;
-    
-    // To quickly add and remove molecules, it will help to have a hashmap which 
+
+    // To quickly add and remove molecules, it will help to have a hashmap which
     // maps Gmolecule ids to an arraylist containing just unbound molecules of
     // that type.  (Unbound because those are the only ones that can undergo
     // creation/decay reactions.)
     private final HashMap<Integer,ArrayList<Molecule>> freeMoleculeMap = new HashMap<>();
-    
+
     // REACTION CLASSES
     private final ArrayList<GDecayReaction> decayReactions;
     private final BindingReactions bindingReactions;
     private final TransitionReactions transitionReactions;
     private final AllostericReactions allostericReactions;
-    
+
     // DATA CLASSES
     private final MoleculeCounter moleculeCounter;
     private final StateCounter stateCounter;
@@ -69,14 +69,14 @@ public class MySystem {
     private final boolean countingClusters;
     private final SitePropertyCounter sitePropertyCounter;
     private final LocationTracker locationTracker;
-    
-    // To assign molecule ids during creation reactions, it helps to have a 
+
+    // To assign molecule ids during creation reactions, it helps to have a
     // global molecule index.
     int molindex = 10000;
     // Keep track of the molecule and site ids so I can link the ids to molecules and types
     private final ArrayList<String> moleculeIDs = new ArrayList<>();
     private final ArrayList<String> siteIDs = new ArrayList<>();
-    
+
     // Spatial system information.
     private final double xmin;
     private final double xmax;
@@ -84,11 +84,11 @@ public class MySystem {
     private final double ymax;
     private final double zmin;
     private final double zmax;
-    
+
     private final int npartx;
     private final int nparty;
     private final int npartz;
-    
+
     // Temporal system information.
     private final double totalTime;
     private final double dt;
@@ -97,7 +97,7 @@ public class MySystem {
     private final double dtimage;
     // Current system time
     private double time = 0;
-    
+
     // File information
     // Input file so we know where to read/write
     private File inputFile;
@@ -109,21 +109,21 @@ public class MySystem {
 //    private File viewerFolder;
     private File viewerFile;
     private File dataFolder;
-    
+
     // When launching from the front end GUI, I want the system updates to go
     // to pre-defined file.  Otherwise, just use the normal System.out
     private final boolean useOutputFile;
-    
+
     // run counter for the viewer and data folders
     private final int runCounter;
     // Image counter for image file io
     private int imageCounter = 0;
-    
+
     // Partition array
     private final Partition[][][] partition;
     private final double [] partitionSize = new double[3];
     private final ArrayList<Partition> activePartitions = new ArrayList<>();
-    
+
     // Time we started the simulation and time it finished
     private long startTime;
     private long stopTime;
@@ -159,7 +159,7 @@ public class MySystem {
      * @param runCounter                                                  *
      * @param useOutputFile
     \**********************************************************************/
-    
+
     public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging){
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         // if an explicit start random seed was found in the input file, we use it and runCounter
@@ -181,19 +181,19 @@ public class MySystem {
             rand = new Random(seed);
         }
         System.out.println("in solver, running: " + runCounter);
-        
+
         this.g = g;
         this.runCounter = runCounter;
         this.useOutputFile = useOutputFile;
         this.vcellMessaging = vcellMessaging;
 
         vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"));
-        
+
         this.decayReactions = g.getDecayReactions();
         bindingReactions = new BindingReactions(g);
         transitionReactions = new TransitionReactions(g, bindingReactions);
         allostericReactions = new AllostericReactions(g, bindingReactions);
-        
+
         this.moleculeCounter = new MoleculeCounter(g, this);
         this.stateCounter = new StateCounter(g, this);
         this.bondCounter = new BondCounter(g, this);
@@ -201,7 +201,7 @@ public class MySystem {
         this.clusterCounter = new ClusterCounter(g, this);
         this.sitePropertyCounter = new SitePropertyCounter(g,this);
         this.locationTracker = new LocationTracker(g, this);
-        
+
         // Spatial informartion.
         double xsize = g.getXsize();
         double ysize = g.getYsize();
@@ -216,68 +216,74 @@ public class MySystem {
         npartx = g.getNpartx();
         nparty = g.getNparty();
         npartz = g.getNpartz();
-        
+
         // Time information.
         totalTime = g.getTotalTime();
         dt = g.getdt();
         dtspring = g.getdtspring();
         dtdata = g.getdtdata();
         dtimage = g.getdtimage();
-        
+
         // Partition setup
         partition = new Partition[npartx][nparty][npartz];
         createPartitions();
-        
+
         // File information and file setup.
         folderSetup();
-        
+
         // Initialize the Molecule hashmap arraylists
         ArrayList<GMolecule> gmolecules = g.getMolecules();
         for (GMolecule gmolecule : gmolecules) {
             freeMoleculeMap.put(gmolecule.getID(), new ArrayList<Molecule>());
         }
-        
+
         makeMolecules();
         // </editor-fold>
     }
-    
+
     // **********************   GET METHODS **************************
-    
+
     public ArrayList<Molecule> getMolecules(){
         return molecules;
     }
-    
+
     public ArrayList<Bond> getBonds(){
         return bonds;
     }
-    
+
     public ArrayList<Site> getSites(){
         return sites;
     }
-    
+
     public double getTime(){
         return time;
     }
-    
+
     public File getFolder(){
         return folder;
     }
-    
+
     public int getRunCounter(){
         return runCounter;
     }
-    
+
     // *********************  FOLDER MANAGEMENT ************************
     private void folderSetup(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         // File information and file setup.
         inputFile = g.getInputFile();
         fileName = inputFile.getName();
         String filePath = inputFile.getAbsolutePath();
         // Strip the file name off of the path
         filePath = filePath.substring(0,filePath.length()-fileName.length());
-        // Strip ".txt" off the file name
-        fileName = fileName.substring(0,fileName.length()-4);
+        // Strip extension off the file name
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            fileName = fileName.substring(0, dotIndex);
+        } else {
+            System.out.println("Expected an extension for the input file: " + fileName);
+        }
+
         /* Check to see if the file is already in a folder named fileName_FOLDER
          * If it is, then we set folder to this folder. If it is not, then
          * we make this folder and we make a copy of the file in that folder.
@@ -287,7 +293,7 @@ public class MySystem {
             folder = new File(filePath);
         } else {
             folder = new File(filePath, folderName);
-            // If this is the first run, then make a new directory and copy the 
+            // If this is the first run, then make a new directory and copy the
             // file into this directory.
             if(runCounter == 0){
                 folder.mkdir();
@@ -309,7 +315,7 @@ public class MySystem {
             } catch(IOException e){
                 System.out.println("'images' folder creation failed in MySystem constructor.");
             }
-        
+
             try{
                 Files.createDirectory(folder.toPath().resolve("videos"));
             } catch(FileAlreadyExistsException fe){
@@ -317,7 +323,7 @@ public class MySystem {
             } catch(IOException e){
                 System.out.println("'videos' folder creation failed in MySystem constructor.");
             }
-            
+
             try{
                 Files.createDirectory(folder.toPath().resolve("viewer_files"));
             } catch(FileAlreadyExistsException fe){
@@ -326,8 +332,8 @@ public class MySystem {
                 System.out.println("'videos' folder creation failed in MySystem constructor.");
             }
         }
-        
-//        // When we make the viewer and data files, we also want to determine which "run" 
+
+//        // When we make the viewer and data files, we also want to determine which "run"
 //        // folder we should create.
 //        try{
 //            viewerFolder = Files.createDirectories(folder.toPath().resolve("viewer_files/Run" + runCounter)).toFile();
@@ -337,7 +343,7 @@ public class MySystem {
 //            System.out.println("'viewer_files' folder creation failed in MySystem constructor.");
 //            viewerFolder = null;
 //        }
-        
+
         try{
             dataFolder = Files.createDirectories(folder.toPath().resolve("data/Run" + runCounter)).toFile();
         } catch(FileAlreadyExistsException fe){
@@ -346,35 +352,35 @@ public class MySystem {
             System.out.println("'data' folder creation failed in MySystem constructor.");
             dataFolder = null;
         }
-        
+
         // Now write the header file
         viewerFile = new File(folder.toString() + "/viewer_files/", fileName + "_VIEW_Run" + runCounter + ".txt");
         writeViewerFileHeader();
         // </editor-fold>
     }
-    
+
     /*********************************************************************\
      *                    FREE MOLECULE MANAGEMENT                       *
-    \*********************************************************************/
-    
+     \*********************************************************************/
+
     private void addFreeMolecule(Molecule molecule){
         ArrayList<Molecule> freeMolecules = freeMoleculeMap.get(molecule.getGID());
         freeMolecules.add(molecule);
     }
-    
+
     private void removeFreeMolecule(Molecule molecule){
         ArrayList<Molecule> freeMolecules = freeMoleculeMap.get(molecule.getGID());
         freeMolecules.remove(molecule);
     }
-    
+
     /**************************************************************\
      *                  RANDOM POSITION                           *
      *  Makes a new random position based on the current system   *
      * bounds.                                                    *
-    \**************************************************************/
-    
+     \**************************************************************/
+
     private MyVector randomVector(int location){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         double xrand = Rand.randomDouble(xmin, xmax);
         double yrand = Rand.randomDouble(ymin, ymax);
         double zrand;
@@ -388,7 +394,7 @@ public class MySystem {
         return new MyVector(xrand, yrand, zrand);
         // </editor-fold>
     }
-    
+
     /*******************************************************************\
      *                COLLISION DETECTION DURING SETUP                 *
      * Checks for collisions with other particles AND with the         *
@@ -396,10 +402,10 @@ public class MySystem {
      * This method is only used during system setup and so does not    *
      * bother using partitions to increase collision detection.  If    *
      * the systems get very very crowded I might need to change this.  *
-    \*******************************************************************/
-    
+     \*******************************************************************/
+
     private boolean siteOverlap(ArrayList<Site> newSites){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         boolean overlap = false;
         double r, rnew;
         for (Site newSite : newSites) {
@@ -462,13 +468,13 @@ public class MySystem {
         return overlap;
         // </editor-fold>
     }
-    
+
     /******************************************************************\
      *           COLLISION DETECTION DURING SIMULATION                *
-    \******************************************************************/
-    
+     \******************************************************************/
+
     private void checkCollisions(Site site, ArrayList<Site> checkSites){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         double x = site.getX();
         double y = site.getY();
         double z = site.getZ();
@@ -547,16 +553,16 @@ public class MySystem {
                         // System.out.println("(state1, state2) = (" + state1.getName() + ", " + state2.getName() + ")");
                         String key1 = state1.getIdAsString();
                         String key2 = state2.getIdAsString();
-                        
+
                         // System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
-                        
+
                         // System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
                         // Now make sure the sites actually react (if they don't
                         // then this prevents an unnecessary random number generation).
                         if(bindingReactions.doReact(key1, key2)){
                             // System.out.println("Looking for reaction.");
                             if(bindingReactions.checkForReaction(key1, key2)){
-                                Bond newBond = new Bond(site, tempSite, 
+                                Bond newBond = new Bond(site, tempSite,
                                         SpringConstant, bindingReactions.getOffProb(key1, key2),
                                         bindingReactions.getName(key1, key2),
                                         bindingReactions.getBondLength(key1, key2));
@@ -584,23 +590,23 @@ public class MySystem {
                             }
                         }
                     }
-                    
+
                 }
             }
         }
         // </editor-fold>
     }
-    
+
     /**********************************************************************\
      *                  ADD ONE MOLECULE TO SYSTEM                        *
      *  Method to add a single molecule to the system, given a gmolecule. *
      *  Makes sense to define this method since the same code is needed   *
      *  when we first initialize the molecules and when we add a new      *
      *  molecule to the system.                                           *
-    \**********************************************************************/
-    
+     \**********************************************************************/
+
     private void addMolecule(GMolecule gmolecule){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         Molecule tempMol;
         ArrayList<Molecule> mapArray = freeMoleculeMap.get(gmolecule.getID());
         boolean overlap;
@@ -647,55 +653,56 @@ public class MySystem {
         }
         // </editor-fold>
     }
-    
+
     /*****************************************************************\
      *                       MAKE MOLECULES                          *
      *  We also create the hashmap between gmolecule ids and         *
      *  arraylists of specific molecules.                            *
-    \*****************************************************************/
-    
+     \*****************************************************************/
+
     private void makeMolecules(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         ArrayList<GMolecule> gmols = g.getMolecules();
         GMolecule gmol;
         Molecule tempMol;
-        
+
         for (GMolecule gmol1 : gmols) {
             gmol = gmol1;
             for(int j=0;j<gmol.getNumber();j++){
+//                System.out.println("Adding molecule: '" + gmol.getName() + "', instance " + j + " of " + gmol.getNumber());
                 addMolecule(gmol);
             }
         }
         // </editor-fold>
     }
-    
+
     /*********************************************************************\
      *                      PARTITION MANAGEMENT                         *
-    \*********************************************************************/
-    
+     \*********************************************************************/
+
     private void createPartitions(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         // get the partition sizes
         double dx = (xmax-xmin)/npartx;
         double dy = (ymax-ymin)/nparty;
         double dz = (zmax-zmin)/npartz;
-        
+
         partitionSize[0] = dx;
         partitionSize[1] = dy;
         partitionSize[2] = dz;
-        
+
         /*
          * Use a temporary 3D array to add the partitions.  This will make it
          * easy to decide which arrays are neighbors. In the end I can throw
          * away that array and just use the 1D array to store them all. To
-         * make the neighbor assignment much much easier, I'm going to use 
+         * make the neighbor assignment much much easier, I'm going to use
          * an array which has extra entries at the border of the array.  Keep
          * these entries null and then I can use a simple if not null statement
-         * below to assign the neighbors. 
+         * below to assign the neighbors.
          */
-        
+
         Partition [][][] tempPartition = new Partition[npartx+2][nparty+2][npartz+2];
-        
+
         for(int i=0;i<npartx+2;i++){
             double x0,x1;
             x0 = xmin + (i-1)*dx;
@@ -705,7 +712,7 @@ public class MySystem {
                 x1 = xmax;
             }
             double [] xs = {x0,x1};
-            
+
             for(int j=0;j<nparty+2;j++){
                 double y0, y1;
                 y0 = ymin + (j-1)*dy;
@@ -715,7 +722,7 @@ public class MySystem {
                     y1 = ymax;
                 }
                 double [] ys = {y0,y1};
-                
+
                 for(int k=0;k<npartz+2;k++){
                     double z0,z1;
                     z0 = zmin + (k-1)*dz;
@@ -725,7 +732,7 @@ public class MySystem {
                         z1 = zmax;
                     }
                     double [] zs = {z0,z1};
-                    
+
                     if(i!=0 && i!=npartx+1 && j!=0 && j!=nparty+1 && k!=0 && k!=npartz+1){
                         tempPartition[i][j][k] = new Partition(xs, ys, zs);
                         //System.out.println("Made partition with x range " + tempPartition[i][j][k].getXString());
@@ -737,9 +744,9 @@ public class MySystem {
                 }
             }
         }
-        
-        // Now loop through and assign neighbors. Each partition will have 
-        // 26 neighbors in 3D. 
+
+        // Now loop through and assign neighbors. Each partition will have
+        // 26 neighbors in 3D.
         for(int i=0;i<npartx+2;i++){
             for(int j=0;j<nparty+2;j++){
                 for(int k=0;k<npartz+2;k++){
@@ -749,10 +756,10 @@ public class MySystem {
                         for(int ii=-1;ii<=1;ii++){
                             for(int jj=-1;jj<=1;jj++){
                                 for(int kk=-1;kk<=1;kk++){
-                                    
+
                                     if(tempPartition[i+ii][j+jj][k+kk] != null){
                                         tempPartition[i][j][k].addPartition(tempPartition[i+ii][j+jj][k+kk]);
-                                        
+
                                     }
                                 }
                             }
@@ -763,9 +770,9 @@ public class MySystem {
         }
         // </editor-fold>
     }
-    
+
     private void assignPartition(Site site){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         int nx = (int)((site.getX()-xmin)/partitionSize[0]);
         int ny = (int)((site.getY()-ymin)/partitionSize[1]);
         int nz = (int)((site.getZ()-zmin)/partitionSize[2]);
@@ -784,16 +791,16 @@ public class MySystem {
         }
         // </editor-fold>
     }
-    
+
     private void clearPartitions(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         for(int i=activePartitions.size()-1;i>-1;i--){
             activePartitions.get(i).clearSites();
         }
         activePartitions.clear();
         // </editor-fold>
     }
-    
+
     /*********************************************************************\
      *                    DECAY REACTION UPDATE                          *
      *  Updates for the decay reactions can be logically separated from  *
@@ -807,10 +814,10 @@ public class MySystem {
      *  do we go through and remove any null molecules from the full     *
      *  molecule list.  There is probably a more efficient way of doing  *
      *  this, but right now I just want to get these reactions working.  *
-    \*********************************************************************/
-    
+     \*********************************************************************/
+
     private void checkDecayReactions(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         ArrayList<Molecule> freeMolecules;
         GDecayReaction decayReaction;
         GMolecule gmol;
@@ -823,7 +830,7 @@ public class MySystem {
             if(reaction == 1){
                 addMolecule(gmol);
             } else if(reaction == -1){
-                // If this reaction occurs the number of free molecules must 
+                // If this reaction occurs the number of free molecules must
                 // be greater than zero.
                 int randIndex = rand.nextInt(freeMolecules.size());
                 Molecule tmol = freeMolecules.remove(randIndex);
@@ -835,14 +842,14 @@ public class MySystem {
         }
         // </editor-fold>
     }
-    
+
     /*******************************************************************\
      *                    SPRING RELAXATION METHOD                     *
      * @param n The number of relaxation steps to take.                *
     \*******************************************************************/
-    
+
     private void relaxSprings(int n){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         Site tempSite1;
         int size = sites.size();
         // NEED TO CLEAR THE PARTITIONS
@@ -851,7 +858,7 @@ public class MySystem {
         for(int i=0;i<size;i++){
             sites.get(i).setRandomForce(0, 0, 0);
         }
-        
+
         int counter = 0;
         while(counter < n){
             // NOW JUST UPDATE THE POSITIONS
@@ -861,7 +868,7 @@ public class MySystem {
                 tempSite1.updatePosition(dtspring);
                 tempSite1.clearSpringForce();
             }
-            
+
             for(int i=links.size()-1;i>-1;i--){
                 links.get(i).updateOrientation();
                 links.get(i).updateForces();
@@ -872,34 +879,34 @@ public class MySystem {
             }
             counter++;
         }
-        
+
         // Now reassign the partitions
         for(int i=0;i<size;i++){
             this.assignPartition(sites.get(i));
         }
         // </editor-fold>
     }
-    
+
     /**********************************************************************\
      *                         SYSTEM UPDATE                              *
      * This is the workhorse method which actually takes the time step    *
      * by updating all of the positions and determining if any reactions  *
      * occurred.                                                          *
-    \**********************************************************************/
-    
+     \**********************************************************************/
+
     private void update(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         double randfx, randfy, randfz;
         Site site1;
         Link link;
         Bond bond;
-        
+
         // Clear the partitions before updating the site positions
         clearPartitions();
-        
+
         // Check for creation/decay reactions
         checkDecayReactions();
-        
+
         int size = sites.size();
         // Now update the positions and assign partitions.
         for(int i=0;i<size;i++){
@@ -908,7 +915,7 @@ public class MySystem {
             transitionReactions.tryReactions(site1);
             // Look to see if this site undergoes an allosteric reaction
             allostericReactions.tryReactions(site1);
-            // IF WE FIX ANY PARTICLES OR RESTRICT MOTION TO 2D, THIS IS 
+            // IF WE FIX ANY PARTICLES OR RESTRICT MOTION TO 2D, THIS IS
             // WHERE THE CODE SHOULD GO. We don't want to calculate any
             // unnecessary Gaussian random variables.
             if(site1.is2D()){
@@ -923,36 +930,36 @@ public class MySystem {
             site1.setRandomForce(randfx, randfy, randfz);
             site1.updatePosition(dt);
             site1.clearSpringForce();
-            // No need to assign the partition here. They get assigned 
+            // No need to assign the partition here. They get assigned
             assignPartition(site1);
             site1.setChecked(false);
-            
+
         }
-        
+
         /**                       RELAX SPRINGS HERE
          * I used to relax the springs in the run() method after the update
-         * method, but I think it's better to relax them here, after the 
-         * sites have been moved but before we check for collisions and reactions. 
+         * method, but I think it's better to relax them here, after the
+         * sites have been moved but before we check for collisions and reactions.
          * For example, consider two molecules, each withe one reactive site
          * and one inactive site.  Imagine that the molecules are near each other,
-         * and after we take a step the reactive sites reaction radii overlap. 
-         * But imagine that the time step was large, so that the springs in the 
-         * molecules are over-stretched, and when we relax the springs the 
-         * reaction radii no longer overlap.  In this case, checking for 
+         * and after we take a step the reactive sites reaction radii overlap.
+         * But imagine that the time step was large, so that the springs in the
+         * molecules are over-stretched, and when we relax the springs the
+         * reaction radii no longer overlap.  In this case, checking for
          * a reaction before relaxing the springs could have led to a reaction
-         * occurring while the spatial constraints imposed by the springs are 
+         * occurring while the spatial constraints imposed by the springs are
          * violated.  In other words, had we taken small enough time steps to
          * begin with, then the sites should never have had a chance to react.
-         * 
+         *
          * Of course, the exact order of these checks won't matter as long as
-         * dt is small enough, but the whole point of using the relaxation 
+         * dt is small enough, but the whole point of using the relaxation
          * step is to allow us to take larger time steps than the springs could
          * tolerate.
-         * 
+         *
          *                          EDIT
-         * 
+         *
          * If we relax the springs here, then after we check for collisions
-         * a spring can be stretched.  The next move update is done with the 
+         * a spring can be stretched.  The next move update is done with the
          * full dt, and that can launch a site out of the system.  I guess
          * springs should be relaxed before and after checking for collisions,
          * but that seems like overkill.  I'm just going move the relax springs
@@ -961,7 +968,7 @@ public class MySystem {
 //        if(relaxationSteps > 2){
 //            relaxSprings(relaxationSteps);
 //        }
-        
+
         // Loop through and check for collisions
         for(int i=0;i<size;i++){
             site1 = sites.get(i);
@@ -977,7 +984,7 @@ public class MySystem {
                 checkCollisions(site1,siteList);
             }
         }
-        
+
         // loop throught the links to determine new forces
         for(int i=links.size()-1;i>-1;i--){
             link = links.get(i);
@@ -1001,14 +1008,14 @@ public class MySystem {
                 bsite[1].setBond(null);
                 Molecule m0 = bsite[0].getMolecule();
                 Molecule m1 = bsite[1].getMolecule();
-                // This part of the code was wrong.  It was removing m0 as a 
+                // This part of the code was wrong.  It was removing m0 as a
                 // binding partner of m1, and vice versa, even if they were
-                // still bound at another site.  This was messing up my 
+                // still bound at another site.  This was messing up my
                 // clustering code, and probably was introducing other errors
                 // I wasn't aware of.  The right way to fix this is to keep
                 // track of the multiplicity of each binding partner. I decided
-                // to fix it by getting rid of the binding partner array and 
-                // just generating it each time I need to count clusters.  
+                // to fix it by getting rid of the binding partner array and
+                // just generating it each time I need to count clusters.
 //                m0.removeBindingPartner(m1);
 //                m1.removeBindingPartner(m0);
                 m0.minusBond();
@@ -1026,15 +1033,15 @@ public class MySystem {
         bonds.removeAll(bondsToRemove);
         // </editor-fold>
     }
-    
+
     /********************************************************************\
      *                            RUN METHOD                            *
      * This is the method which implements the loop to run the system   *
      * simulation.                                                      *
-    \********************************************************************/
-    
+     \********************************************************************/
+
     public void runSystem() throws IOException {
-        // <editor-fold defaultstate="collapsed" desc="Method Code">  
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         System.out.println("This stdout file is associated with run counter " + runCounter + ".");
         System.out.println("Simulation started.");
         startTime = System.currentTimeMillis();
@@ -1043,9 +1050,9 @@ public class MySystem {
         int percentComplete = 0;
         double nextDataTime = dtdata;
         double nextImageTime = dtimage;
-        
+
         int relaxationSteps = (int)(dt/dtspring);
-        
+
         // GET THE DATA AT THE ZERO TIME POINT
         writePositions();
         moleculeCounter.countMolecules();
@@ -1061,17 +1068,17 @@ public class MySystem {
         sitePropertyCounter.countProperties();
 //        locationTracker.initializeMaps();
 //        locationTracker.trackPositions();
-        // We go ever so slightly over the last time point to make sure we 
+        // We go ever so slightly over the last time point to make sure we
         // get data at the last time point.
         while(time < totalTime + dt){
             // Look to see if we should output data
             if(time >= nextDataTime){
                 moleculeCounter.countMolecules();
                 // moleculeCounter.writePartialData(dataFolder);
-                
+
                 stateCounter.countStates();
                 // stateCounter.writePartialData(dataFolder);
-                
+
                 bondCounter.countBonds();
                 // bondCounter.writePartialData(dataFolder);
                 if(countingClusters){
@@ -1080,7 +1087,7 @@ public class MySystem {
                 }
                 sitePropertyCounter.countProperties();
 //                locationTracker.trackPositions();
-                
+
                 nextDataTime += dtdata;
             }
             // Look to see if we should output an image
@@ -1101,7 +1108,7 @@ public class MySystem {
                 } else {
                     System.out.println("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
                 }
-                
+
                 nextRealTime += (totalTime/100.0);
             }
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(time/(totalTime + dt), time)); // progress message are throttled by vcellMessaging
@@ -1111,9 +1118,9 @@ public class MySystem {
             if(relaxationSteps > 2){
                 relaxSprings(relaxationSteps);
             }
-            
+
         }
-            
+
         stopTime = System.currentTimeMillis();
         try(PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "RunningTime.txt")))){
             pw.println("Running Time: " + IOHelp.formatTime(startTime, stopTime));
@@ -1129,31 +1136,48 @@ public class MySystem {
 
         stateCounter.writeFullData(dataFolder);
         // FileHelp.deleteAllFilesStartWith(dataFolder, "State_Counts_At_Time_");
-        
+
         bondCounter.writeFullData(dataFolder);
         // FileHelp.deleteAllFilesStartWith(dataFolder, "Bond_Counts_At_Time_");
-        
+
         sitePropertyCounter.writeData(dataFolder);
 //        locationTracker.writeData(dataFolder);
         System.out.println("Finished writing data.");
         // postprocess data
         // get file extension from inputFile
         String idaFileExtension = ".ida";
+        String clustersFileExtension = ".json";
         String inputFileExtension = inputFile.getName().substring(inputFile.getName().lastIndexOf("."));
-        File idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, idaFileExtension));
+
+        File idaFile;
+        File clustersFile;
+        if(getRunCounter() == 0) {
+            // we allow the ida file for run 0 to stay without run count suffix
+            idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, idaFileExtension));
+            clustersFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, clustersFileExtension));
+        } else {
+            // for run counts > 0 we add run count suffix
+            String parentDirectory = inputFile.getParent();
+            String fileNameWithoutExtension = inputFile.getName().split("\\.")[0];
+            String newIdaFileName = fileNameWithoutExtension + "_" + getRunCounter() + idaFileExtension;
+            idaFile = new File(parentDirectory, newIdaFileName);
+            String newClustersFileName = fileNameWithoutExtension + "_" + getRunCounter() + clustersFileExtension;
+            clustersFile = new File(parentDirectory, newClustersFileName);
+        }
         LangevinPostprocessor.writeIdaFile(dataFolder.toPath(),idaFile.toPath());
+        LangevinPostprocessor.writeClustersFile(dataFolder.toPath(),clustersFile.toPath());
         vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(1.0, time));
         vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, time));
         vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(time));
         // </editor-fold>
     }
-    
+
     /**********************************************************************\
      *                       FILE IO METHODS                              *
-    \**********************************************************************/
-    
+     \**********************************************************************/
+
     private void writeViewerFileHeader(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code"> 
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         try(PrintWriter p = new PrintWriter(new FileWriter(viewerFile), true)) {
             p.print("TotalTime\t" + totalTime + "\n");
             p.print("dtimage\t" + dtimage + "\n");
@@ -1166,16 +1190,16 @@ public class MySystem {
         }
         // </editor-fold>
     }
-    
+
     private void writePositions(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code"> 
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         try(PrintWriter p = new PrintWriter(new FileWriter(viewerFile, true), true)) {
             p.print("SCENE\n");
             p.print("SceneNumber\t" + imageCounter + "\tCurrentTime"
                     + "\t" + time + "\n");
             for (Site s : sites) {
                 p.print("ID\t" + s.getID() + "\t" + s.getRadius() + "\t"
-                        + s.getColor() + "\t" 
+                        + s.getColor() + "\t"
                         + IOHelp.DF[6].format(s.getX()) + "\t"
                         + IOHelp.DF[6].format(s.getY()) + "\t"
                         + IOHelp.DF[6].format(s.getZ()) + "\n");
@@ -1185,7 +1209,7 @@ public class MySystem {
                         + l.getSite(1).getID() + "\n");
             }
             for (Bond b : bonds) {
-                p.print("Link\t" + b.getSite(0).getID() + "\t:\t" 
+                p.print("Link\t" + b.getSite(0).getID() + "\t:\t"
                         + b.getSite(1).getID() + "\n");
             }
             p.print("\n");
@@ -1195,9 +1219,9 @@ public class MySystem {
         imageCounter++;
         // </editor-fold>
     }
-   
+
     private void writeMoleculeIDs(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code"> 
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         File file = new File(dataFolder, "MoleculeIDs.csv");
         try(PrintWriter p = new PrintWriter(new FileWriter(file), true)){
             for(String idString : moleculeIDs){
@@ -1208,9 +1232,9 @@ public class MySystem {
         }
         // </editor-fold>
     }
-    
+
     private void writeSiteIDs(){
-        // <editor-fold defaultstate="collapsed" desc="Method Code"> 
+        // <editor-fold defaultstate="collapsed" desc="Method Code">
         File file = new File(dataFolder, "SiteIDs.csv");
         try(PrintWriter p = new PrintWriter(new FileWriter(file), true)){
             for(String idString : siteIDs){
