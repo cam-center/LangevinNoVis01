@@ -53,6 +53,10 @@ public class RunCommand implements Callable<Integer> {
             System.err.println("Model file not found: " + modelFile);
             return 1;
         }
+        if(runCounter == null || runCounter < 0) {
+            System.err.println("Run counter must be a positive number. Found: " + runCounter);
+            return 1;
+        }
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         if (sendStatusConfig != null) {
             try {

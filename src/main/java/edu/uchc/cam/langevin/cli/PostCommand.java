@@ -1,5 +1,6 @@
 package edu.uchc.cam.langevin.cli;
 
+import edu.uchc.cam.langevin.langevinnovis01.ConsolidationPostprocessor;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import org.vcell.messaging.*;
@@ -45,14 +46,19 @@ public class PostCommand implements Callable<Integer> {
     public PostCommand() {
     }
 
-    public Integer call() throws IOException {
+    public Integer call() throws IOException, InterruptedException {
         Global g;
-        MySystem sys;
+        ConsolidationPostprocessor cp;
         System.out.println("Version = "+Version.GIT_VERSION);
         if (modelFile == null || !modelFile.exists()){
             System.err.println("Model file not found: " + modelFile);
             return 1;
         }
+        if(numRuns == null || numRuns <= 0) {
+            System.err.println("Number of runs must be a non-zero positive number. Found: " + numRuns);
+            return 1;
+        }
+
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         if (sendStatusConfig != null) {
             try {
@@ -73,14 +79,13 @@ public class PostCommand implements Callable<Integer> {
         }
         if (logFile == null) {
             g = new Global(modelFile);
-//            sys = new MySystem(g, runCounter, false, vcellMessaging);
+            cp = new ConsolidationPostprocessor(g, numRuns, false, vcellMessaging);
         } else {
             g = new Global(modelFile, logFile);
-//            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            cp = new ConsolidationPostprocessor(g, numRuns, true, vcellMessaging);
         }
 
-//        sys.runSystem();
-        // g.writeData("AlloInputData.txt");
+        cp.runConsolidation();
         return 0;
     }
 }

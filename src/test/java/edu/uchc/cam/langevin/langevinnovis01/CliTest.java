@@ -135,7 +135,9 @@ public class CliTest {
 
 //        Path tempDirectory = Files.createTempDirectory(temp_dir_name);        // correct temp location for automatic testing
         Path modelFile = tempDirectory.resolve(sim_base_name+".langevinInput");
-        Path logFile = tempDirectory.resolve(sim_base_name+".log");
+        Path logFile_0 = tempDirectory.resolve(sim_base_name+".log");
+        Path logFile_1 = tempDirectory.resolve(sim_base_name+"_1.log");
+        Path logFile_P = tempDirectory.resolve(sim_base_name+"_P.log");
         Path idaFile_0 = tempDirectory.resolve(sim_base_name+".ida");
         Path idaFile_1 = tempDirectory.resolve(sim_base_name+"_1.ida");
         Path jsonClustersFile_0 = tempDirectory.resolve(sim_base_name+".json");
@@ -144,18 +146,20 @@ public class CliTest {
         Files.writeString(modelFile, inputFileContents);
 //        VCellMessaging vcellMessaging = new VCellMessagingLocal();
 
+        assertEquals(true, modelFile.toFile().exists(), "Model file should exist");
+
         String[] args = {       // command arguments, run 0
                 "simulate",
                 modelFile.toFile().getAbsolutePath(),   // Langevin model file
                 "0",                               // we absolutely need a run counter of 0 to properly initialize dirs
-                "--output-log", logFile.toFile().getAbsolutePath(), // Output log file
+                "--output-log", logFile_0.toFile().getAbsolutePath(), // Output log file
                 "--vc-print-status"                // Enable status printing
         };
         String[] args1 = {       // command arguments, run 1
                 "simulate",
                 modelFile.toFile().getAbsolutePath(),   // Langevin model file
-                "1",                               // we absolutely need a run counter of 0 to properly initialize dirs
-                "--output-log", logFile.toFile().getAbsolutePath(), // Output log file
+                "1",
+                "--output-log", logFile_1.toFile().getAbsolutePath(), // Output log file
                 "--vc-print-status"                // Enable status printing
         };
 
@@ -165,20 +169,27 @@ public class CliTest {
             exitCode = cmd.execute(args);
 
             assertEquals(0, exitCode, "Expected command to execute successfully");
-            assertEquals(true, modelFile.toFile().exists(), "Model file should exist");
-            assertEquals(true, logFile.toFile().exists(), "Log file should exist");
+            assertEquals(true, logFile_0.toFile().exists(), "Log file 0 should exist");
             assertEquals(true, idaFile_0.toFile().exists(), "ida file 0 should exist");
             assertEquals(true, jsonClustersFile_0.toFile().exists(), "json clusters file 0 should exist");
 
             exitCode = cmd.execute(args1);
             assertEquals(0, exitCode, "Expected command to execute successfully");
+            assertEquals(true, logFile_1.toFile().exists(), "Log file 1 should exist");
             assertEquals(true, idaFile_1.toFile().exists(), "ida file 1 should exist");
             assertEquals(true, jsonClustersFile_1.toFile().exists(), "json clusters file 1 should exist");
 
             // -------------------------------------------------------------------------------------------------
 
-
-
+            String[] argsP = {       // command arguments, postprocessing run
+                    "postprocess",
+                    modelFile.toFile().getAbsolutePath(),   // Langevin model file
+                    "2",        // number of runs
+                    "--output-log", logFile_P.toFile().getAbsolutePath(), // Output log file
+                    "--vc-print-status"                // Enable status printing
+            };
+            exitCode = cmd.execute(argsP);
+            assertEquals(0, exitCode, "Expected command to execute successfully");
 
         } finally {
             // uncomment this for automatic run
