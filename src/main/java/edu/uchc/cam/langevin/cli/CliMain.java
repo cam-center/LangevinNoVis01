@@ -8,7 +8,8 @@ import picocli.CommandLine;
         versionProvider = Version.class,
         description = "Langevin solver and utilities.",
         subcommands = {
-                RunCommand.class
+                RunCommand.class,
+                PostCommand.class
         })
 public class CliMain {
     public static void main(String[] args) {

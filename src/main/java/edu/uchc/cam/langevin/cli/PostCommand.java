@@ -1,5 +1,6 @@
 package edu.uchc.cam.langevin.cli;
 
+import edu.uchc.cam.langevin.langevinnovis01.ConsolidationPostprocessor;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import org.vcell.messaging.*;
@@ -11,13 +12,13 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 
-@CommandLine.Command(name = "simulate", description = "Run a Langevin simulation.", mixinStandardHelpOptions = true, versionProvider = Version.class, subcommands = {})
-public class RunCommand implements Callable<Integer> {
+@CommandLine.Command(name = "postprocess", description = "Consolidate results and compute cluster stats over multiple trials.", mixinStandardHelpOptions = true, versionProvider = Version.class, subcommands = {})
+public class PostCommand implements Callable<Integer> {
     @CommandLine.Parameters(description = "Langevin model file", index = "0", type = File.class)
     private File modelFile = null;
 
-    @CommandLine.Parameters(description = "run counter", index = "1", type = Integer.class)
-    private Integer runCounter = null;      // we always start with run 0 (the solver does special things only during run 0, like the movie data)
+    @CommandLine.Parameters(description = "num runs", index = "1", type = Integer.class)
+    private Integer numRuns = null;
 
     @CommandLine.Option(names = {"--output-log"}, required = false, type = File.class, description = "output log file")
     private File logFile = null;
@@ -33,7 +34,7 @@ public class RunCommand implements Callable<Integer> {
                 jobIndex=0
                 """;
     @CommandLine.Option(names = {"--vc-send-status-config"}, required = false, type = File.class,
-                        description = "messaging property file:\n\n" + example_config)
+            description = "messaging property file:\n\n" + example_config)
     private File sendStatusConfig = null;
 
     @CommandLine.Option(names = {"--vc-print-status"}, required = false, type = Boolean.class, description = "print vcell status to stdout and stderr")
@@ -42,21 +43,22 @@ public class RunCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"-tid"}, required = false, hidden = true, type = Integer.class, description = "task id supplied by vcell - ignored for now")
     private Integer taskId_NOT_USED = null;
 
-    public RunCommand() {
+    public PostCommand() {
     }
 
-    public Integer call() throws IOException {
+    public Integer call() throws IOException, InterruptedException {
         Global g;
-        MySystem sys;
+        ConsolidationPostprocessor cp;
         System.out.println("Version = "+Version.GIT_VERSION);
         if (modelFile == null || !modelFile.exists()){
             System.err.println("Model file not found: " + modelFile);
             return 1;
         }
-        if(runCounter == null || runCounter < 0) {
-            System.err.println("Run counter must be a positive number. Found: " + runCounter);
+        if(numRuns == null || numRuns <= 0) {
+            System.err.println("Number of runs must be a non-zero positive number. Found: " + numRuns);
             return 1;
         }
+
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         if (sendStatusConfig != null) {
             try {
@@ -77,14 +79,13 @@ public class RunCommand implements Callable<Integer> {
         }
         if (logFile == null) {
             g = new Global(modelFile);
-            sys = new MySystem(g, runCounter, false, vcellMessaging);
+            cp = new ConsolidationPostprocessor(g, numRuns, false, vcellMessaging);
         } else {
             g = new Global(modelFile, logFile);
-            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            cp = new ConsolidationPostprocessor(g, numRuns, true, vcellMessaging);
         }
 
-        sys.runSystem();
-        // g.writeData("AlloInputData.txt");
+        cp.runConsolidation();
         return 0;
     }
 }
