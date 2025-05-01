@@ -2,18 +2,22 @@ package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.cli.CliMain;
 import edu.uchc.cam.langevin.cli.RunCommand;
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.VCellMessagingLocal;
 import picocli.CommandLine;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CliTest {
 
@@ -124,7 +128,24 @@ public class CliTest {
     String sim_base_name = "sim";
     String temp_dir_name = "test_simulation";
     int runCounter = 0;
+
 // --------------------------------------------------------------------------
+
+    @Test
+    public void testConsolidation() throws FileNotFoundException {
+
+        int numRuns = 2;
+
+        String simulationFolderName = parent_dir + File.separator + temp_dir_name;
+        File simulationFolder = new File(simulationFolderName);
+
+        Map<String, File> fileMap = FileMapper.getFileMap(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
+        fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
+
+        assertTrue(fileMap.size() == numRuns, "expected size " + numRuns + " but found " + fileMap.size());
+//        assertEquals(numRuns, fileMap.size());
+
+    }
 
     @Test
     public void testRunCommand() throws IOException {

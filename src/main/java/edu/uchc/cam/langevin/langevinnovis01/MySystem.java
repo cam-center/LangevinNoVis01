@@ -25,7 +25,6 @@ import java.io.*;
 import java.math.BigInteger;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +33,10 @@ import java.util.List;
 import java.util.Random;
 
 public class MySystem {
+
+    public static final String IdaFileExtension = ".ida";
+    public static final String ClustersFileExtension = ".json";
+
     // Source of the global variables
     Global g;
     Random rand;
@@ -1145,23 +1148,21 @@ public class MySystem {
         System.out.println("Finished writing data.");
         // postprocess data
         // get file extension from inputFile
-        String idaFileExtension = ".ida";
-        String clustersFileExtension = ".json";
         String inputFileExtension = inputFile.getName().substring(inputFile.getName().lastIndexOf("."));
 
         File idaFile;
         File clustersFile;
         if(getRunCounter() == 0) {
             // we allow the ida file for run 0 to stay without run count suffix
-            idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, idaFileExtension));
-            clustersFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, clustersFileExtension));
+            idaFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, IdaFileExtension));
+            clustersFile = new File(inputFile.getParentFile(), inputFile.getName().replace(inputFileExtension, ClustersFileExtension));
         } else {
             // for run counts > 0 we add run count suffix
             String parentDirectory = inputFile.getParent();
             String fileNameWithoutExtension = inputFile.getName().split("\\.")[0];
-            String newIdaFileName = fileNameWithoutExtension + "_" + getRunCounter() + idaFileExtension;
+            String newIdaFileName = fileNameWithoutExtension + "_" + getRunCounter() + IdaFileExtension;
             idaFile = new File(parentDirectory, newIdaFileName);
-            String newClustersFileName = fileNameWithoutExtension + "_" + getRunCounter() + clustersFileExtension;
+            String newClustersFileName = fileNameWithoutExtension + "_" + getRunCounter() + ClustersFileExtension;
             clustersFile = new File(parentDirectory, newClustersFileName);
         }
         LangevinPostprocessor.writeIdaFile(dataFolder.toPath(),idaFile.toPath());

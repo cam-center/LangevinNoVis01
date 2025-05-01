@@ -6,31 +6,10 @@
 
 package edu.uchc.cam.langevin.langevinnovis01;
 
-import edu.uchc.cam.langevin.counter.*;
-import edu.uchc.cam.langevin.g.object.GMolecule;
-import edu.uchc.cam.langevin.g.object.GState;
-import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
-import edu.uchc.cam.langevin.helpernovis.IOHelp;
-import edu.uchc.cam.langevin.helpernovis.Location;
-import edu.uchc.cam.langevin.helpernovis.Rand;
-import edu.uchc.cam.langevin.object.*;
-import edu.uchc.cam.langevin.reaction.AllostericReactions;
-import edu.uchc.cam.langevin.reaction.BindingReactions;
-import edu.uchc.cam.langevin.reaction.TransitionReactions;
-import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
-import org.vcell.messaging.WorkerEvent;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.math.BigInteger;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+import java.io.*;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 public class ConsolidationPostprocessor {
 
@@ -72,12 +51,19 @@ public class ConsolidationPostprocessor {
     }
 
 
-        public void runConsolidation() throws InterruptedException {
+    public void runConsolidation() throws InterruptedException, FileNotFoundException {
 
-            System.out.println("Running consolidation for " + numRuns + " tasks");
-            TimeUnit.SECONDS.sleep(3);
+        System.out.println("Running consolidation for " + numRuns + " tasks");
 
-            System.out.println("Done!");
+        Map<String, File> fileMap = FileMapper.getFileMap(simulationFolder, simulationName, MySystem.IdaFileExtension);
+        if(fileMap.size() != numRuns) {
+            throw new RuntimeException("Expected ida file map size " + numRuns + " but found " + fileMap.size());
+        }
+        fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
+
+        // TODO: make LangevinInput object, like ODESolverResultSet
+
+        System.out.println("Done!");
     }
 
 }
