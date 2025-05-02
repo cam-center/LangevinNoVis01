@@ -1,4 +1,4 @@
-package edu.uchc.cam.langevin.langevinnovis01;
+package edu.uchc.cam.langevin.helpernovis;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -20,7 +20,7 @@ public class FileMapper {
      * sorts they key by the numeric suffix, keeps the one without a counter (if present) as first element,
      * ignores the ones with non-numeric suffixes
      */
-    public static Map<String, File> getFileMap(File directory, String prefix, String extension) throws FileNotFoundException {
+    public static Map<String, File> getFileMapByName(File directory, String prefix, String extension) throws FileNotFoundException {
 
         if (directory == null || !directory.exists() || !directory.isDirectory()) {
             throw new FileNotFoundException("The specified directory does not exist: " + directory);
@@ -80,7 +80,7 @@ public class FileMapper {
         String prefix = "mySim";
         String extension = ".ida";
 
-        Map<String, File> fileMap = getFileMap(directory, prefix, extension);
+        Map<String, File> fileMap = getFileMapByName(directory, prefix, extension);
 
         // Print the results
         fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));

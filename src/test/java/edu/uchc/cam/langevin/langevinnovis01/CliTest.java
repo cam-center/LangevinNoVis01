@@ -1,11 +1,8 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.cli.CliMain;
-import edu.uchc.cam.langevin.cli.RunCommand;
-import org.junit.Assert;
+import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import org.junit.jupiter.api.Test;
-import org.vcell.messaging.VCellMessaging;
-import org.vcell.messaging.VCellMessagingLocal;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -139,12 +136,12 @@ public class CliTest {
         String simulationFolderName = parent_dir + File.separator + temp_dir_name;
         File simulationFolder = new File(simulationFolderName);
 
-        Map<String, File> fileMap = FileMapper.getFileMap(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
+        Map<String, File> fileMap = FileMapper.getFileMapByName(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
         fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
-
         assertTrue(fileMap.size() == numRuns, "expected size " + numRuns + " but found " + fileMap.size());
 //        assertEquals(numRuns, fileMap.size());
 
+        
     }
 
     @Test

@@ -6,6 +6,7 @@
 
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import org.vcell.messaging.VCellMessaging;
 
 import java.io.*;
@@ -55,7 +56,7 @@ public class ConsolidationPostprocessor {
 
         System.out.println("Running consolidation for " + numRuns + " tasks");
 
-        Map<String, File> fileMap = FileMapper.getFileMap(simulationFolder, simulationName, MySystem.IdaFileExtension);
+        Map<String, File> fileMap = FileMapper.getFileMapByName(simulationFolder, simulationName, MySystem.IdaFileExtension);
         if(fileMap.size() != numRuns) {
             throw new RuntimeException("Expected ida file map size " + numRuns + " but found " + fileMap.size());
         }
