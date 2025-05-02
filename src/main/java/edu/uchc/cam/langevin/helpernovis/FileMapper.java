@@ -1,18 +1,45 @@
 package edu.uchc.cam.langevin.helpernovis;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class FileMapper {
+
+    public static Map<Integer, SolverResultSet> processFiles(File directory, String prefix, String extension) throws IOException {
+
+        Map<String, File> fileMap = getFileMapByName(directory, prefix, extension); // get filtered files
+        Map<Integer, SolverResultSet> solverResultSetMap = new TreeMap<>();
+
+        Pattern pattern = Pattern.compile("^" + prefix + "(?:_(\\d+))?" + extension + "$");
+
+        for (Map.Entry<String, File> entry : fileMap.entrySet()) {
+            String fileName = entry.getKey();
+            File file = entry.getValue();
+
+            Matcher matcher = pattern.matcher(file.getName());
+            if (matcher.matches()) {
+                int key = matcher.group(1) == null ? 0 : Integer.parseInt(matcher.group(1)); // base file is key=0
+
+                SolverResultSet resultSet = new SolverResultSet();
+                List<ColumnDescription> columnDescriptions = new ArrayList<>();
+                ArrayList<double[]> values = new ArrayList<>();
+
+                // parse file
+                parseFile(file, columnDescriptions, values);
+                resultSet.setColumnDescriptions(columnDescriptions);
+                resultSet.getValues().addAll(values);
+
+                solverResultSetMap.put(key, resultSet);
+            }
+        }
+
+        return solverResultSetMap;
+    }
 
     /*
      * read a directory, identifies files that match a naming convention (prefix, numeric suffix, extension)
@@ -27,7 +54,7 @@ public class FileMapper {
         }
 
         Map<Integer, File> sortedMap = new TreeMap<>(); // treeMap ensures numeric sorting
-        File baseFile = null;       // stores the file without a numeric counter, if present
+        File baseFile = null;       // store the file without a numeric counter, if present
 
         Pattern pattern = Pattern.compile("^" + prefix + "(?:_(\\d+))?" + extension + "$");
 
@@ -45,44 +72,43 @@ public class FileMapper {
                 }
             }
         }
-
-        // Merge results into LinkedHashMap (maintaining order)
-        LinkedHashMap<String, File> fileMap = new LinkedHashMap<>();
+        LinkedHashMap<String, File> fileMap = new LinkedHashMap<>();    // merge results into LinkedHashMap (maintaining order)
         if (baseFile != null) {
-            fileMap.put(prefix, baseFile); // Put the base file first
+            fileMap.put(prefix, baseFile); // put the base file first
         }
         sortedMap.forEach((counter, file) -> fileMap.put(prefix + "_" + counter, file));
-
         return fileMap;
     }
 
-    public static File createDirectory(String parentDir, String tempDirName) throws IOException {
-        // ensure the base directory exists
-        Path parentPath = Paths.get(parentDir);
-        if (!Files.exists(parentPath)) {
-            throw new IOException("parent directory does not exist: " + parentDir);
+    public static void parseFile(File file, List<ColumnDescription> columnDescriptions, ArrayList<double[]> values) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            // read the first line (column names)
+            String headerLine = reader.readLine();
+            if (headerLine == null) {
+                throw new IOException("empty file: " + file.getName());
+            }
+
+            String[] headers = headerLine.split(":");
+            columnDescriptions.clear();
+            for (String header : headers) {
+                columnDescriptions.add(new ColumnDescription(header));
+            }
+
+            // read and parse the data lines
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] tokens = line.split(" ");
+                double[] rowData = Arrays.stream(tokens)
+                        .mapToDouble(Double::parseDouble)
+                        .toArray();
+                values.add(rowData);
+            }
+
+            // evaluate triviality for each column
+            for (int i = 0; i < columnDescriptions.size(); i++) {
+                columnDescriptions.get(i).evaluateTriviality(values, i);
+            }
         }
-
-        // construct the full directory path
-        Path dirPath = parentPath.resolve(tempDirName);
-
-        // create the directory if it does not exist
-        if (!Files.exists(dirPath)) {
-            Files.createDirectories(dirPath);
-        }
-
-        return dirPath.toFile(); // return as a File object
     }
 
-
-    public static void main(String[] args) throws FileNotFoundException {
-        File directory = new File("path/to/your/directory"); // Change to your actual path
-        String prefix = "mySim";
-        String extension = ".ida";
-
-        Map<String, File> fileMap = getFileMapByName(directory, prefix, extension);
-
-        // Print the results
-        fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));
-    }
 }

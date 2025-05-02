@@ -1,7 +1,9 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.cli.CliMain;
+import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
+import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
@@ -11,6 +13,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -129,7 +133,7 @@ public class CliTest {
 // --------------------------------------------------------------------------
 
     @Test
-    public void testConsolidation() throws FileNotFoundException {
+    public void testConsolidation() throws IOException {
 
         int numRuns = 2;
 
@@ -141,7 +145,15 @@ public class CliTest {
         assertTrue(fileMap.size() == numRuns, "expected size " + numRuns + " but found " + fileMap.size());
 //        assertEquals(numRuns, fileMap.size());
 
-        
+        Map<Integer, SolverResultSet> solverResultSetMap = FileMapper.processFiles(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
+        solverResultSetMap.forEach((key, resultSet) -> {
+            System.out.println("Key: " + key);
+            System.out.println("Columns: " + resultSet.getColumnDescriptions());
+            System.out.println("Data:");
+            resultSet.getValues().forEach(row -> System.out.println(Arrays.toString(row)));
+        });
+        assertTrue(solverResultSetMap.size() == numRuns, "expected size " + numRuns + " but found " + solverResultSetMap.size());
+
     }
 
     @Test

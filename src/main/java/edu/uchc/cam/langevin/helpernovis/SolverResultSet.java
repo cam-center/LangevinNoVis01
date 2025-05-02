@@ -3,6 +3,7 @@ package edu.uchc.cam.langevin.helpernovis;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class SolverResultSet implements Serializable {
 
@@ -10,43 +11,26 @@ public class SolverResultSet implements Serializable {
     public static final String TIME_COLUMN = TIME;
     public static final int TIME_COLUMN_INDEX = 0;
 
-    private ArrayList<double[]> values = new ArrayList<>();  // List of rows (each row is a double[])
-    private ColumnDescription[] columnDescriptions = null;
+    public ArrayList<double[]> values;  // List of rows (each row is a double[])
+    public List<ColumnDescription> columnDescriptions;;
 
-
-
-
-
-    public static void parseFile(File file, ColumnDescription[] columnDescriptions, ArrayList<double[]> values) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            // read the first line (column names)
-            String headerLine = reader.readLine();
-            if (headerLine == null) {
-                throw new IOException("empty file: " + file.getName());
-            }
-
-            String[] headers = headerLine.split(":");
-            columnDescriptions = new ColumnDescription[headers.length];
-
-            for (int i = 0; i < headers.length; i++) {
-                columnDescriptions[i] = new ColumnDescription(headers[i]);
-            }
-
-            // read and parse the data lines
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] tokens = line.split(" ");
-                double[] rowData = Arrays.stream(tokens)
-                        .mapToDouble(Double::parseDouble)
-                        .toArray();
-                values.add(rowData);
-            }
-
-            // evaluate triviality for each column
-            for (int i = 0; i < columnDescriptions.length; i++) {
-                columnDescriptions[i].evaluateTriviality(values, i);
-            }
-        }
+    public SolverResultSet() {
+        this.columnDescriptions = new ArrayList<>();
+        this.values = new ArrayList<>();
     }
+
+    public void setColumnDescriptions(List<ColumnDescription> columnDescriptions) {
+        this.columnDescriptions = columnDescriptions;
+    }
+
+    public List<ColumnDescription> getColumnDescriptions() {
+        return columnDescriptions;
+    }
+
+    public ArrayList<double[]> getValues() {
+        return values;
+    }
+
+    // TODO: bring parseFile here
 
 }
