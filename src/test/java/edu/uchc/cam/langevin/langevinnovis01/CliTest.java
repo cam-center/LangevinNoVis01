@@ -1,19 +1,16 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.cli.CliMain;
-import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 
@@ -140,12 +137,14 @@ public class CliTest {
         String simulationFolderName = parent_dir + File.separator + temp_dir_name;
         File simulationFolder = new File(simulationFolderName);
 
-        Map<String, File> fileMap = FileMapper.getFileMapByName(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
-        fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
-        assertTrue(fileMap.size() == numRuns, "expected size " + numRuns + " but found " + fileMap.size());
+        // read the tasks results (,ida files) and make a map where key = run name, value = task results File object
+        Map<String, File> nameToIdaFileMap = FileMapper.getFileMapByName(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
+        nameToIdaFileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
+        assertTrue(nameToIdaFileMap.size() == numRuns, "expected size " + numRuns + " but found " + nameToIdaFileMap.size());
 //        assertEquals(numRuns, fileMap.size());
 
-        Map<Integer, SolverResultSet> solverResultSetMap = FileMapper.processFiles(simulationFolder, sim_base_name, MySystem.IdaFileExtension);
+        // read the name to Ida file map, key = run index (first index is 0), value = solver result set for the run with that index
+        Map<Integer, SolverResultSet> solverResultSetMap = FileMapper.filesToSolverResultSetMap(sim_base_name, nameToIdaFileMap);
         solverResultSetMap.forEach((key, resultSet) -> {
             System.out.println("Key: " + key);
             System.out.println("Columns: " + resultSet.getColumnDescriptions());

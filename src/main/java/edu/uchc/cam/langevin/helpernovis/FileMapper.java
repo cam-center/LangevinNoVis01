@@ -1,27 +1,39 @@
 package edu.uchc.cam.langevin.helpernovis;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class FileMapper {
 
-    public static Map<Integer, SolverResultSet> processFiles(File directory, String prefix, String extension) throws IOException {
+    // Map<String, File> nameToIdaFileMap
+
+    public static Map<Integer, SolverResultSet> filesToSolverResultSetMap(File directory, String prefix, String extension) throws IOException {
 
         Map<String, File> fileMap = getFileMapByName(directory, prefix, extension); // get filtered files
+
+        Map<Integer, SolverResultSet> solverResultSetMap;
+        solverResultSetMap = filesToSolverResultSetMap(prefix, fileMap);
+        return solverResultSetMap;
+    }
+
+    /*
+     * read the name to Ida file map, use it to make the solver result set map
+     *    key = run index (first index is 0)
+     *    value = solver result set for the run with that index
+     */
+    public static Map<Integer, SolverResultSet> filesToSolverResultSetMap(String prefix, Map<String, File> fileMap) throws IOException {
+
         Map<Integer, SolverResultSet> solverResultSetMap = new TreeMap<>();
 
-        Pattern pattern = Pattern.compile("^" + prefix + "(?:_(\\d+))?" + extension + "$");
+        Pattern pattern = Pattern.compile("^" + prefix + "(?:_(\\d+))?" + "$");
 
         for (Map.Entry<String, File> entry : fileMap.entrySet()) {
             String fileName = entry.getKey();
             File file = entry.getValue();
 
-            Matcher matcher = pattern.matcher(file.getName());
+            Matcher matcher = pattern.matcher(fileName);
             if (matcher.matches()) {
                 int key = matcher.group(1) == null ? 0 : Integer.parseInt(matcher.group(1)); // base file is key=0
 
@@ -30,14 +42,13 @@ public class FileMapper {
                 ArrayList<double[]> values = new ArrayList<>();
 
                 // parse file
-                parseFile(file, columnDescriptions, values);
+                SolverResultSet.parseFile(file, columnDescriptions, values);
                 resultSet.setColumnDescriptions(columnDescriptions);
                 resultSet.getValues().addAll(values);
 
                 solverResultSetMap.put(key, resultSet);
             }
         }
-
         return solverResultSetMap;
     }
 
@@ -80,35 +91,35 @@ public class FileMapper {
         return fileMap;
     }
 
-    public static void parseFile(File file, List<ColumnDescription> columnDescriptions, ArrayList<double[]> values) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            // read the first line (column names)
-            String headerLine = reader.readLine();
-            if (headerLine == null) {
-                throw new IOException("empty file: " + file.getName());
-            }
-
-            String[] headers = headerLine.split(":");
-            columnDescriptions.clear();
-            for (String header : headers) {
-                columnDescriptions.add(new ColumnDescription(header));
-            }
-
-            // read and parse the data lines
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] tokens = line.split(" ");
-                double[] rowData = Arrays.stream(tokens)
-                        .mapToDouble(Double::parseDouble)
-                        .toArray();
-                values.add(rowData);
-            }
-
-            // evaluate triviality for each column
-            for (int i = 0; i < columnDescriptions.size(); i++) {
-                columnDescriptions.get(i).evaluateTriviality(values, i);
-            }
-        }
-    }
+//    public static void parseFile(File file, List<ColumnDescription> columnDescriptions, ArrayList<double[]> values) throws IOException {
+//        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+//            // read the first line (column names)
+//            String headerLine = reader.readLine();
+//            if (headerLine == null) {
+//                throw new IOException("empty file: " + file.getName());
+//            }
+//
+//            String[] headers = headerLine.split(":");
+//            columnDescriptions.clear();
+//            for (String header : headers) {
+//                columnDescriptions.add(new ColumnDescription(header));
+//            }
+//
+//            // read and parse the data lines
+//            String line;
+//            while ((line = reader.readLine()) != null) {
+//                String[] tokens = line.split(" ");
+//                double[] rowData = Arrays.stream(tokens)
+//                        .mapToDouble(Double::parseDouble)
+//                        .toArray();
+//                values.add(rowData);
+//            }
+//
+//            // evaluate triviality for each column
+//            for (int i = 0; i < columnDescriptions.size(); i++) {
+//                columnDescriptions.get(i).evaluateTriviality(values, i);
+//            }
+//        }
+//    }
 
 }

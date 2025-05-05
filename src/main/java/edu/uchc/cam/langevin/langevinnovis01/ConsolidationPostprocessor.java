@@ -7,6 +7,7 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
+import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
 import org.vcell.messaging.VCellMessaging;
 
 import java.io.*;
@@ -52,17 +53,31 @@ public class ConsolidationPostprocessor {
     }
 
 
-    public void runConsolidation() throws InterruptedException, FileNotFoundException {
+    public void runConsolidation() throws InterruptedException, IOException {
 
         System.out.println("Running consolidation for " + numRuns + " tasks");
 
-        Map<String, File> fileMap = FileMapper.getFileMapByName(simulationFolder, simulationName, MySystem.IdaFileExtension);
-        if(fileMap.size() != numRuns) {
-            throw new RuntimeException("Expected ida file map size " + numRuns + " but found " + fileMap.size());
+        // read the tasks results (,ida files) and make a map where
+        //   key = run name (without extension)
+        //   value = task results File object
+        Map<String, File> nameToIdaFileMap = FileMapper.getFileMapByName(simulationFolder, simulationName, MySystem.IdaFileExtension);
+        if(nameToIdaFileMap.size() != numRuns) {
+            throw new RuntimeException("Expected ida file map size " + numRuns + " but found " + nameToIdaFileMap.size());
         }
-        fileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
+//        nameToIdaFileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
 
-        // TODO: make LangevinInput object, like ODESolverResultSet
+        // read the name to Ida file map, use it to make the solver result set map
+        //   key = run index (first index is 0)
+        //   value = solver result set for the run with that index
+        Map<Integer, SolverResultSet> solverResultSetMap = FileMapper.filesToSolverResultSetMap(simulationName, nameToIdaFileMap);
+//        solverResultSetMap.forEach((key, resultSet) -> {      // show results
+//            System.out.println("Key: " + key);
+//            System.out.println("Columns: " + resultSet.getColumnDescriptions());
+//            System.out.println("Data:");
+//            resultSet.getValues().forEach(row -> System.out.println(Arrays.toString(row)));
+//        });
+
+
 
         System.out.println("Done!");
     }

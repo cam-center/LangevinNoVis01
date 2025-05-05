@@ -31,6 +31,35 @@ public class SolverResultSet implements Serializable {
         return values;
     }
 
-    // TODO: bring parseFile here
+    public static void parseFile(File file, List<ColumnDescription> columnDescriptions, ArrayList<double[]> values) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            // read the first line (column names)
+            String headerLine = reader.readLine();
+            if (headerLine == null) {
+                throw new IOException("empty file: " + file.getName());
+            }
+
+            String[] headers = headerLine.split(":");
+            columnDescriptions.clear();
+            for (String header : headers) {
+                columnDescriptions.add(new ColumnDescription(header));
+            }
+
+            // read and parse the data lines
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] tokens = line.split(" ");
+                double[] rowData = Arrays.stream(tokens)
+                        .mapToDouble(Double::parseDouble)
+                        .toArray();
+                values.add(rowData);
+            }
+
+            // evaluate triviality for each column
+            for (int i = 0; i < columnDescriptions.size(); i++) {
+                columnDescriptions.get(i).evaluateTriviality(values, i);
+            }
+        }
+    }
 
 }
