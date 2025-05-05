@@ -1,6 +1,7 @@
 package edu.uchc.cam.langevin.cli;
 
 import edu.uchc.cam.langevin.langevinnovis01.ConsolidationPostprocessor;
+import edu.uchc.cam.langevin.langevinnovis01.ConsolidationPostprocessorInput;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import org.vcell.messaging.*;
@@ -85,7 +86,9 @@ public class PostCommand implements Callable<Integer> {
             cp = new ConsolidationPostprocessor(g, numRuns, true, vcellMessaging);
         }
 
-        cp.runConsolidation();
+        ConsolidationPostprocessorInput cpi = new ConsolidationPostprocessorInput();
+        cpi.readInputFiles(cp);
+        cp.runConsolidation(cpi);
         return 0;
     }
 }
