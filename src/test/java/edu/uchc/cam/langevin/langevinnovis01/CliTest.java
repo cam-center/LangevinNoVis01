@@ -156,6 +156,52 @@ public class CliTest {
     }
 
     @Test
+    public void testPostCommand() throws IOException {
+
+        // TODO: put a set of ida and json files in the repository ann use those for calculation testing
+        // for now, assume the input (.langevinInput) and results (.ida, .json) files are present (in the working tempDirectory)
+
+        Path parentFolder = Paths.get(parent_dir);
+        Path tempDirectory = parentFolder.resolve(temp_dir_name);   // use a convenient location for debugging
+        Files.createDirectories(tempDirectory);
+
+//        Path tempDirectory = Files.createTempDirectory(temp_dir_name);        // correct temp location for automatic testing
+        Path modelFile = tempDirectory.resolve(sim_base_name+".langevinInput");
+        Path logFile_0 = tempDirectory.resolve(sim_base_name+".log");
+        Path logFile_1 = tempDirectory.resolve(sim_base_name+"_1.log");
+        Path logFile_P = tempDirectory.resolve(sim_base_name+"_P.log");
+        Path idaFile_0 = tempDirectory.resolve(sim_base_name+".ida");
+        Path idaFile_1 = tempDirectory.resolve(sim_base_name+"_1.ida");
+        Path jsonClustersFile_0 = tempDirectory.resolve(sim_base_name+".json");
+        Path jsonClustersFile_1 = tempDirectory.resolve(sim_base_name+"_1.json");
+
+        Files.writeString(modelFile, inputFileContents);
+//        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        assertEquals(true, modelFile.toFile().exists(), "Model file should exist");
+        assertTrue(modelFile.toFile().length() > 0, "Model file should not be empty");
+
+
+        try {
+            CommandLine cmd = new CommandLine(new CliMain());
+
+            String[] argsP = {       // command arguments, postprocessing run
+                    "postprocess",
+                    modelFile.toFile().getAbsolutePath(),   // Langevin model file
+                    "2",        // number of runs
+                    "--output-log", logFile_P.toFile().getAbsolutePath(), // Output log file
+                    "--vc-print-status"                // Enable status printing
+            };
+            int exitCode = cmd.execute(argsP);
+            assertEquals(0, exitCode, "Expected command to execute successfully");
+
+        } finally {
+            // uncomment this for automatic run
+//            deleteDirectory(tempDirectory.toFile());
+            System.out.println("finally!");
+        }
+    }
+
+    @Test
     public void testRunCommand() throws IOException {
 
         Path parentFolder = Paths.get(parent_dir);

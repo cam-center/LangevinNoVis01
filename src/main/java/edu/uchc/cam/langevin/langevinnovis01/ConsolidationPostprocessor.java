@@ -6,6 +6,7 @@
 
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
 import org.vcell.messaging.VCellMessaging;
@@ -24,6 +25,12 @@ public class ConsolidationPostprocessor {
 
     Map<String, File> nameToIdaFileMap = null;
     Map<Integer, SolverResultSet> solverResultSetMap = null;
+
+    // the results
+    SolverResultSet averagesResultSet;
+    SolverResultSet stdResultSet;
+    SolverResultSet minResultSet;
+    SolverResultSet maxResultSet;
 
 
     public int getNumRuns() {                   // getters
@@ -58,6 +65,8 @@ public class ConsolidationPostprocessor {
         this.vcellMessaging = vcellMessaging;
 
         folderSetup();
+
+//        ConsolidationPostProcessorOutput cpo = new ConsolidationPostProcessorOutput();
     }
 
     private void folderSetup() {
@@ -84,7 +93,93 @@ public class ConsolidationPostprocessor {
         this.nameToIdaFileMap = cpi.getNameToIdaFileMap();
         this.solverResultSetMap = cpi.getSolverResultSetMap();
 
+
+
+        try {
+            SolverResultSet tempSolverResultSet = solverResultSetMap.get(0);
+
+            // sanity check: shouldn't be, that only works for non-spatial stochastic where things are done differently
+
+            averagesResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
+            stdResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
+            minResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
+            maxResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
+
+            calculateLangevinPrimaryStatistics();   // averages, standard deviation, min, max
+//            calculateLangevinAdvancedStatistics();
+
+        } catch(Exception dae) {        // DataAccessException ?
+//            pllOut.setFailed(true);
+//            pllOut.setMultiTrial(isMultiTrial);
+//            return pllOut;
+        }
+
+
+
         System.out.println("Done!");
     }
+
+    private void calculateLangevinPrimaryStatistics() {
+
+        int numTrials = solverResultSetMap.size();
+        for(int trialIndex = 0; trialIndex < numTrials; trialIndex++) {
+            SolverResultSet sourceOsrs = solverResultSetMap.get(trialIndex);
+            int rowCount = sourceOsrs.getRowCount();
+            for (int row = 0; row < rowCount; row++) {
+                double[] sourceRowData = sourceOsrs.getRow(row);
+                double[] averageRowData = averagesResultSet.getRow(row);    // destination average
+                double[] minRowData = minResultSet.getRow(row);             // destination min
+                double[] maxRowData = maxResultSet.getRow(row);             // destination max
+
+                for (int i = 0; i < averageRowData.length; i++) {
+                    ColumnDescription cd = averagesResultSet.getColumnDescriptions(i);
+                    String name = cd.getVariableName();
+                    if (name.equals("t")) {
+                        continue;
+                    }
+                    averageRowData[i] += sourceRowData[i] / numTrials;
+                    if (minRowData[i] > sourceRowData[i]) {
+                        minRowData[i] = sourceRowData[i];
+                    }
+                    if (maxRowData[i] < sourceRowData[i]) {
+                        maxRowData[i] = sourceRowData[i];
+                    }
+                }
+            }
+        }
+        for(int trialIndex = 0; trialIndex < numTrials; trialIndex++) {
+            SolverResultSet sourceOsrs = solverResultSetMap.get(trialIndex);
+            int rowCount = sourceOsrs.getRowCount();
+            for (int row = 0; row < rowCount; row++) {
+                double[] sourceRowData = sourceOsrs.getRow(row);
+                double[] averageRowData = averagesResultSet.getRow(row);
+                double[] stdRowData = stdResultSet.getRow(row);    // destination std
+
+                for (int i = 0; i < averageRowData.length; i++) {
+                    ColumnDescription cd = averagesResultSet.getColumnDescriptions(i);
+                    String name = cd.getVariableName();
+                    if (name.equals("t")) {
+                        continue;
+                    }
+                    double variance = Math.pow(sourceRowData[i] - averageRowData[i], 2);
+                    stdRowData[i] += variance / numTrials;
+                }
+            }
+        }
+        int rowCount = stdResultSet.getRowCount();
+        for (int row = 0; row < rowCount; row++) {
+            double[] stdRowData = stdResultSet.getRow(row);
+            for (int i = 0; i < stdRowData.length; i++) {
+                ColumnDescription cd = stdResultSet.getColumnDescriptions(i);
+                String name = cd.getVariableName();
+                if (name.equals("t")) {
+                    continue;
+                }
+                double variance = stdRowData[i];
+                stdRowData[i] = Math.sqrt(variance);
+            }
+        }
+    }
+
 
 }
