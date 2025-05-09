@@ -53,6 +53,20 @@ public class ConsolidationPostprocessor {
         this.simulationFolder = simulationFolder;
     }
 
+    public SolverResultSet getAveragesResultSet() {
+        return averagesResultSet;
+    }
+    public SolverResultSet getStdResultSet() {
+        return stdResultSet;
+    }
+    public SolverResultSet getMinResultSet() {
+        return minResultSet;
+    }
+    public SolverResultSet getMaxResultSet() {
+        return maxResultSet;
+    }
+
+
     private File simulationFolder;       // top folder, where the input file is (and also the .ida and ,json files are)
 
     public ConsolidationPostprocessor(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging) {
@@ -131,12 +145,7 @@ public class ConsolidationPostprocessor {
                 double[] minRowData = minResultSet.getRow(row);             // destination min
                 double[] maxRowData = maxResultSet.getRow(row);             // destination max
 
-                for (int i = 0; i < averageRowData.length; i++) {
-                    ColumnDescription cd = averagesResultSet.getColumnDescriptions(i);
-                    String name = cd.getVariableName();
-                    if (name.equals("t")) {
-                        continue;
-                    }
+                for (int i = 1; i < averageRowData.length; i++) {   // we skip time, assuming it's always the first column
                     averageRowData[i] += sourceRowData[i] / numTrials;
                     if (minRowData[i] > sourceRowData[i]) {
                         minRowData[i] = sourceRowData[i];
@@ -155,12 +164,7 @@ public class ConsolidationPostprocessor {
                 double[] averageRowData = averagesResultSet.getRow(row);
                 double[] stdRowData = stdResultSet.getRow(row);    // destination std
 
-                for (int i = 0; i < averageRowData.length; i++) {
-                    ColumnDescription cd = averagesResultSet.getColumnDescriptions(i);
-                    String name = cd.getVariableName();
-                    if (name.equals("t")) {
-                        continue;
-                    }
+                for (int i = 1; i < averageRowData.length; i++) {
                     double variance = Math.pow(sourceRowData[i] - averageRowData[i], 2);
                     stdRowData[i] += variance / numTrials;
                 }
@@ -169,17 +173,11 @@ public class ConsolidationPostprocessor {
         int rowCount = stdResultSet.getRowCount();
         for (int row = 0; row < rowCount; row++) {
             double[] stdRowData = stdResultSet.getRow(row);
-            for (int i = 0; i < stdRowData.length; i++) {
-                ColumnDescription cd = stdResultSet.getColumnDescriptions(i);
-                String name = cd.getVariableName();
-                if (name.equals("t")) {
-                    continue;
-                }
+            for (int i = 1; i < stdRowData.length; i++) {
                 double variance = stdRowData[i];
                 stdRowData[i] = Math.sqrt(variance);
             }
         }
     }
-
 
 }

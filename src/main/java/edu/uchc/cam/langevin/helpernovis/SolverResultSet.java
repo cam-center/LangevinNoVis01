@@ -9,6 +9,9 @@ public class SolverResultSet implements Serializable {
     public static final String TIME_COLUMN = TIME;
     public static final int TIME_COLUMN_INDEX = 0;
 
+    public static final String HeaderSeparator = ":";
+    public static final String ValuesSeparator = " ";
+
     // list of rows, each row is a double[] (values of the variables at a particular timepoint
     // since time is always the first column, for each row the first double is the time
     public ArrayList<double[]> values;
@@ -78,7 +81,7 @@ public class SolverResultSet implements Serializable {
                 throw new IOException("empty file: " + file.getName());
             }
 
-            String[] headers = headerLine.split(":");
+            String[] headers = headerLine.split(HeaderSeparator);
             columnDescriptions.clear();
             for (String header : headers) {
                 columnDescriptions.add(new ColumnDescription(header));
@@ -87,7 +90,7 @@ public class SolverResultSet implements Serializable {
             // read and parse the data lines
             String line;
             while ((line = reader.readLine()) != null) {
-                String[] tokens = line.split(" ");
+                String[] tokens = line.split(ValuesSeparator);
                 double[] rowData = Arrays.stream(tokens)
                         .mapToDouble(Double::parseDouble)
                         .toArray();
