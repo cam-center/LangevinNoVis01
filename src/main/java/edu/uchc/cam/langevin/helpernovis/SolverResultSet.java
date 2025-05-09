@@ -2,6 +2,8 @@ package edu.uchc.cam.langevin.helpernovis;
 
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class SolverResultSet implements Serializable {
 
@@ -20,6 +22,29 @@ public class SolverResultSet implements Serializable {
     public enum DuplicateMode {
         CopyValues,
         ZeroInitialize
+    }
+    static class MoleculeInfo {
+        String bondType;
+        String moleculeName;
+        String siteName = "any";   // Default assumption
+        String stateName = "any";  // Default assumption
+
+        public MoleculeInfo(String bondType, String moleculeName, String siteName, String stateName) {
+            this.bondType = bondType;
+            this.moleculeName = moleculeName;
+            this.siteName = siteName;
+            this.stateName = stateName;
+        }
+
+        @Override
+        public String toString() {
+            return "MoleculeInfo{" +
+                    "bondType='" + bondType + '\'' +
+                    ", moleculeName='" + moleculeName + '\'' +
+                    ", siteName='" + siteName + '\'' +
+                    ", stateName='" + stateName + '\'' +
+                    '}';
+        }
     }
 
     public SolverResultSet() {
@@ -81,6 +106,11 @@ public class SolverResultSet implements Serializable {
                 throw new IOException("empty file: " + file.getName());
             }
 
+            List<String> reactions = new ArrayList<>();
+            List<MoleculeInfo> molecules = new ArrayList<>();
+            parseHeaders(headerLine, reactions, molecules);
+
+
             String[] headers = headerLine.split(HeaderSeparator);
             columnDescriptions.clear();
             for (String header : headers) {
@@ -100,6 +130,32 @@ public class SolverResultSet implements Serializable {
             // evaluate triviality for each column
             for (int i = 0; i < columnDescriptions.size(); i++) {
                 columnDescriptions.get(i).evaluateTriviality(values, i);
+            }
+        }
+    }
+
+    // separates entities in the header in bond type, molecule name, site name, state name
+    // no use right now but may be useful in the future, we have molecules, reactions aso in Global
+    public static void parseHeaders(String headerLine, List<String> reactions, List<MoleculeInfo> molecules) {
+        String[] headers = headerLine.split(":");
+
+//        Pattern moleculePattern = Pattern.compile("(TOTAL|FREE|BOUND)_(\\w+)(?:__(Site\\d+))?(?:__(state\\d+))?");
+        Pattern moleculePattern = Pattern.compile("(TOTAL|FREE|BOUND)_([A-Za-z0-9]+)(?:__(Site\\d+))?(?:__(state\\d+))?");
+
+        for (String header : headers) {
+            if (!header.contains("__") && !header.matches("(TOTAL|FREE|BOUND)_.*")) {
+                // No "__" -> It's a reaction
+                reactions.add(header);
+            } else {
+                Matcher matcher = moleculePattern.matcher(header);
+                if (matcher.matches()) {
+                    String bondType = matcher.group(1);
+                    String moleculeName = matcher.group(2);
+                    String siteName = matcher.group(3) != null ? matcher.group(3) : "any";
+                    String stateName = matcher.group(4) != null ? matcher.group(4) : "any";
+
+                    molecules.add(new MoleculeInfo(bondType, moleculeName, siteName, stateName));
+                }
             }
         }
     }
