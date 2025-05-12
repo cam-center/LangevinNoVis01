@@ -176,8 +176,9 @@ public class LangevinPostprocessor {
         Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile);
     }
 
-
-    static class TimePointClustersInfo implements Serializable {
+    // trivial cluster = single molecules
+    // non-trivial cluster = 2 molecules or more (bound together)
+    public static class TimePointClustersInfo implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("timePointTotalClusters")
@@ -186,7 +187,7 @@ public class LangevinPostprocessor {
         @JsonProperty("timePointClusterInfoList")
         List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
     }
-    static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
+    public static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("clusterIndex")

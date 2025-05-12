@@ -120,7 +120,7 @@ public class ConsolidationPostprocessor {
             maxResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
 
             calculateLangevinPrimaryStatistics();   // averages, standard deviation, min, max
-//            calculateLangevinAdvancedStatistics();
+            calculateLangevinAdvancedStatistics();
 
         } catch(Exception dae) {        // DataAccessException ?
 //            pllOut.setFailed(true);
@@ -178,6 +178,11 @@ public class ConsolidationPostprocessor {
                 stdRowData[i] = Math.sqrt(variance);
             }
         }
+    }
+
+    private void calculateLangevinAdvancedStatistics() {
+
+
     }
 
 }
