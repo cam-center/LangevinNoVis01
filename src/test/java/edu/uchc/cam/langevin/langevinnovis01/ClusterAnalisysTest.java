@@ -46,14 +46,42 @@ public class ClusterAnalisysTest {
 
 
     @Test
+    public void readJsonFiles() throws IOException {
+
+        VCellMessaging vcellMessaging = new VCellMessagingNoop();
+        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
+        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
+
+        Global g = new Global(modelFile);
+        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
+        cp.setSimulationFolder(simulationFolder);
+        cp.setNumRuns(NumRuns);
+        cp.setSimulationName(sim_base_name);
+        Map<String, Integer> molecules = ConsolidationPostprocessor.getMolecules(g);
+
+        ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
+        cai.readInputFiles(cp);
+
+        Map<String, File> nameToJsonFileMap = cai.getNameToJsonFileMap();
+        Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap = cai.getAllRunsClusterInfoMap();
+        assertTrue(NumRuns == nameToJsonFileMap.size(), "number of .json files should be equal to " + NumRuns);
+
+        System.out.println("done");
+    }
+
+    @Test
     public void makeJsonFiles() throws IOException {
 
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
+        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
+
         Global g = new Global(modelFile);
         ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
-        Map<String, Integer> molecules = getMolecules(g);
-
+        cp.setSimulationFolder(simulationFolder);
+        cp.setNumRuns(NumRuns);
+        cp.setSimulationName(sim_base_name);
+        Map<String, Integer> molecules = ConsolidationPostprocessor.getMolecules(g);
 
         for(int runCounter=0; runCounter < NumRuns; runCounter++) {
 
@@ -62,27 +90,13 @@ public class ClusterAnalisysTest {
             String newClustersFileName = sim_base_name + "_" + runCounter + ClustersFileExtension;
             File clustersFile = new File(parent_dir, newClustersFileName);
             LangevinPostprocessor.writeClustersFile(runDataFolder.toPath(), clustersFile.toPath());
-
-
-
             Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile.toPath());
-
-
-
             System.out.println("aici");
         }
 
-
-        System.out.println("done");
+            System.out.println("done");
     }
 
-    private static Map<String, Integer> getMolecules(Global g) {
-        Map<String, Integer> molecules = new LinkedHashMap<>();
-        for(GMolecule m : g.getMolecules()) {
-            molecules.put(m.getName(), m.getNumber());
-        }
-        return molecules;
-    }
 
 
 }

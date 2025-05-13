@@ -52,6 +52,50 @@ public class SolverResultSet implements Serializable {
         this.values = new ArrayList<>();
     }
 
+    // find the column index by variable name
+    private int getColumnIndex(String variableName) {
+        for (int i = 0; i < columnDescriptions.size(); i++) {
+            if (columnDescriptions.get(i).getVariableName().equals(variableName)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+    // get column by variable name
+    public List<Double> getColumn(String variableName) {
+        int columnIndex = getColumnIndex(variableName);
+        if (columnIndex == -1) {
+            throw new IllegalArgumentException("Variable name not found: " + variableName);
+        }
+        return getColumn(columnIndex);
+    }
+    // get column by index
+    public List<Double> getColumn(int columnIndex) {
+        List<Double> columnValues = new ArrayList<>();
+        for (double[] row : values) {
+            columnValues.add(row[columnIndex]);
+        }
+        return columnValues;
+    }
+    // get timepoint series by time
+    public double[] getValuesByTime(double time) {
+        for (double[] row : values) {
+            if (row[TIME_COLUMN_INDEX] == time) {
+                return row;  // row where time matches
+            }
+        }
+        throw new IllegalArgumentException("Time value not found: " + time);
+    }
+    // get timepoint series by index
+    public double[] getValuesByIndex(int index) {
+        if (index < 0 || index >= values.size()) {
+            throw new IndexOutOfBoundsException("Invalid timepoint index: " + index);
+        }
+        return values.get(index);
+    }
+
+
+
     public static SolverResultSet deepCopy(SolverResultSet original, DuplicateMode mode) {
         SolverResultSet copy = new SolverResultSet();
         copy.columnDescriptions = new ArrayList<>(original.columnDescriptions);

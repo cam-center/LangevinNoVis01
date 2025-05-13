@@ -83,11 +83,9 @@ public class PostCommand implements Callable<Integer> {
             cp = new ConsolidationPostprocessor(g, numRuns, true, vcellMessaging);
         }
 
-        ConsolidationPostprocessorInput cpi = new ConsolidationPostprocessorInput();
-        cpi.readInputFiles(cp);
-        cp.runConsolidation(cpi);
-        ConsolidationPostprocessorOutput cpo = new ConsolidationPostprocessorOutput(cp);
-        cpo.writeResultFiles();
+        cp.calculateLangevinPrimaryStatistics();
+        cp.calculateLangevinAdvancedStatistics();
+
         return 0;
     }
 }

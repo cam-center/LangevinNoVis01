@@ -6,9 +6,11 @@
 
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
+import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
 
 import java.io.*;
@@ -18,20 +20,23 @@ public class ConsolidationPostprocessor {
 
     private Global g;
     private final VCellMessaging vcellMessaging;
-    private int numRuns;
+    private int numRuns;        // number of runs
     private final boolean useOutputFile;
 
-    private String simulationName;       // model / simulation name (without extension)
+    private String simulationName;          // model / simulation name (without extension)
+    private File simulationFolder;          // top folder, where the input file is (and also the .ida and ,json files are)
 
-    Map<String, File> nameToIdaFileMap = null;
-    Map<Integer, SolverResultSet> solverResultSetMap = null;
+    List<Double> timeInSeconds = null;      // used in ClusterAnalysis
 
-    // the results
-    SolverResultSet averagesResultSet;
-    SolverResultSet stdResultSet;
-    SolverResultSet minResultSet;
-    SolverResultSet maxResultSet;
 
+    public ConsolidationPostprocessor(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging) {
+        this.g = g;
+        this.numRuns = numRuns;
+        this.useOutputFile = useOutputFile;
+        this.vcellMessaging = vcellMessaging;
+
+        folderSetup();
+    }
 
     public int getNumRuns() {                   // getters
         return numRuns;
@@ -42,7 +47,6 @@ public class ConsolidationPostprocessor {
     public File getSimulationFolder() {
         return simulationFolder;
     }
-
     public void setNumRuns(int numRuns) {       // setters
         this.numRuns = numRuns;
     }
@@ -51,36 +55,6 @@ public class ConsolidationPostprocessor {
     }
     public void setSimulationFolder(File simulationFolder) {
         this.simulationFolder = simulationFolder;
-    }
-
-    public SolverResultSet getAveragesResultSet() {
-        return averagesResultSet;
-    }
-    public SolverResultSet getStdResultSet() {
-        return stdResultSet;
-    }
-    public SolverResultSet getMinResultSet() {
-        return minResultSet;
-    }
-    public SolverResultSet getMaxResultSet() {
-        return maxResultSet;
-    }
-
-
-    private File simulationFolder;       // top folder, where the input file is (and also the .ida and ,json files are)
-
-    public ConsolidationPostprocessor(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging) {
-
-        System.out.println("Constructor of consolidation postprocessor.");
-
-        this.g = g;
-        this.numRuns = numRuns;
-        this.useOutputFile = useOutputFile;
-        this.vcellMessaging = vcellMessaging;
-
-        folderSetup();
-
-//        ConsolidationPostProcessorOutput cpo = new ConsolidationPostProcessorOutput();
     }
 
     private void folderSetup() {
@@ -100,40 +74,23 @@ public class ConsolidationPostprocessor {
         }
     }
 
+    // -------------------------------------------------------------------------------------------------------
+    public void calculateLangevinPrimaryStatistics() throws IOException {
 
-    public void runConsolidation(ConsolidationPostprocessorInput cpi) throws InterruptedException, IOException {
+        ConsolidationPostprocessorInput cpi = new ConsolidationPostprocessorInput();
+        cpi.readInputFiles(this);
 
-        System.out.println("Running consolidation for " + numRuns + " tasks");
-        this.nameToIdaFileMap = cpi.getNameToIdaFileMap();
-        this.solverResultSetMap = cpi.getSolverResultSetMap();
+        Map<String, File> nameToIdaFileMap = cpi.getNameToIdaFileMap();
+        Map<Integer, SolverResultSet> solverResultSetMap = cpi.getSolverResultSetMap();
 
+        SolverResultSet tempSolverResultSet = solverResultSetMap.get(0);
+        timeInSeconds = tempSolverResultSet.getColumn(SolverResultSet.TIME_COLUMN);
 
-
-        try {
-            SolverResultSet tempSolverResultSet = solverResultSetMap.get(0);
-
-            // sanity check: shouldn't be, that only works for non-spatial stochastic where things are done differently
-
-            averagesResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
-            stdResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
-            minResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
-            maxResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
-
-            calculateLangevinPrimaryStatistics();   // averages, standard deviation, min, max
-            calculateLangevinAdvancedStatistics();
-
-        } catch(Exception dae) {        // DataAccessException ?
-//            pllOut.setFailed(true);
-//            pllOut.setMultiTrial(isMultiTrial);
-//            return pllOut;
-        }
-
-
-
-        System.out.println("Done!");
-    }
-
-    private void calculateLangevinPrimaryStatistics() {
+        // the output result sets
+        SolverResultSet averagesResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
+        SolverResultSet stdResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
+        SolverResultSet minResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
+        SolverResultSet maxResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.CopyValues);
 
         int numTrials = solverResultSetMap.size();
         for(int trialIndex = 0; trialIndex < numTrials; trialIndex++) {
@@ -178,11 +135,40 @@ public class ConsolidationPostprocessor {
                 stdRowData[i] = Math.sqrt(variance);
             }
         }
+        ConsolidationPostprocessorOutput cpo = new ConsolidationPostprocessorOutput(this);
+        cpo.writeResultFiles(averagesResultSet, stdResultSet, minResultSet,maxResultSet);
     }
 
-    private void calculateLangevinAdvancedStatistics() {
+    // ---------------------------------------------------------------------------------------------
+    public void calculateLangevinAdvancedStatistics() throws FileNotFoundException {
+
+        Map<String, Integer> moleculesMap = getMolecules(g);
+        ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
+        cai.readInputFiles(this);
+
+        Map<String, File> nameToJsonFileMap = cai.getNameToJsonFileMap();
+        Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap = cai.getAllRunsClusterInfoMap();
 
 
+
+        int numTimePoints = timeInSeconds.size();   // number of timepoints
+
+        for(int time = 0; time < numTimePoints; time++) {
+
+        }
+
+
+
+    }
+
+
+    // -------------------------------------------------------------------------------------
+    static Map<String, Integer> getMolecules(Global g) {
+        Map<String, Integer> molecules = new LinkedHashMap<>();
+        for(GMolecule m : g.getMolecules()) {
+            molecules.put(m.getName(), m.getNumber());
+        }
+        return molecules;
     }
 
 }

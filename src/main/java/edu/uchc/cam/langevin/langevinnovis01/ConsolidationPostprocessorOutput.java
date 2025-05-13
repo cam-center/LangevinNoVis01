@@ -14,19 +14,9 @@ public class ConsolidationPostprocessorOutput {
     private File simulationFolder;
     private String simulationName;
 
-    private SolverResultSet averagesResultSet;
-    private SolverResultSet stdResultSet;
-    private SolverResultSet minResultSet;
-    private SolverResultSet maxResultSet;
-
     public ConsolidationPostprocessorOutput(ConsolidationPostprocessor cp) {
         simulationFolder = cp.getSimulationFolder();
         simulationName = cp.getSimulationName();
-
-        averagesResultSet = cp.getAveragesResultSet();
-        stdResultSet = cp.getStdResultSet();
-        minResultSet = cp.getMinResultSet();
-        maxResultSet = cp.getMaxResultSet();
     }
 
     public enum ResultType {
@@ -71,7 +61,8 @@ public class ConsolidationPostprocessorOutput {
     }
 
 
-    public void writeResultFiles() throws IOException {
+    public void writeResultFiles(SolverResultSet averagesResultSet, SolverResultSet stdResultSet,
+                                 SolverResultSet minResultSet, SolverResultSet maxResultSet) throws IOException {
 
         writeCsvFile(averagesResultSet, ResultType.AVG);
         writeCsvFile(stdResultSet, ResultType.STD);
