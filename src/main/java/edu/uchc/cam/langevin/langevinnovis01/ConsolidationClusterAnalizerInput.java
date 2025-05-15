@@ -39,8 +39,21 @@ public class ConsolidationClusterAnalizerInput {
         nameToJsonFileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
 
         allRunsClusterInfoMap = FileMapper.getAllRunsClusterMap(cp.getSimulationName(), nameToJsonFileMap);
-
-        System.out.println("aici");
     }
 
+    public LangevinPostprocessor.TimePointClustersInfo getRow(double timepointIndex, int runIndex) {
+        Map<Double, LangevinPostprocessor.TimePointClustersInfo> currentRunClusterInfoMap = allRunsClusterInfoMap.get(runIndex);
+        LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = currentRunClusterInfoMap.get(timepointIndex);
+        return timePointClustersInfo;
+    }
+
+    public List<Double> getTimeInSecondsList() {
+        List<Double> timeInSecondsList = new ArrayList<> ();
+        Map<Double, LangevinPostprocessor.TimePointClustersInfo> currentRunClusterInfoMap = allRunsClusterInfoMap.get(0);
+        for (Map.Entry<Double, LangevinPostprocessor.TimePointClustersInfo> entry : currentRunClusterInfoMap.entrySet()) {
+            double key = entry.getKey();
+            timeInSecondsList.add(key);
+        }
+        return timeInSecondsList;
+    }
 }

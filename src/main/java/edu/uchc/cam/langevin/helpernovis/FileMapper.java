@@ -95,9 +95,9 @@ public class FileMapper {
     }
 
     /*
-     * read the name to Ida file map, use it to make the solver result set map
+     * read the name to json file map, use it to make the result map
      *    key = run index (first index is 0)
-     *    value = solver result set for the run with that index
+     *    value = ClusterInfoMap for the run with that index
      */
     public static Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> getAllRunsClusterMap(String prefix, Map<String, File> fileMap) throws IOException {
 
