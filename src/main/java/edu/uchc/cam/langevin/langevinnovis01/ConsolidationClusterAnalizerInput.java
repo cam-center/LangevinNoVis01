@@ -33,18 +33,14 @@ public class ConsolidationClusterAnalizerInput {
     }
 
     //---------------------------------------------------------------------------------------------
-    public void readInputFiles(ConsolidationPostprocessor cp) throws FileNotFoundException {
+    public void readInputFiles(ConsolidationPostprocessor cp) throws IOException {
 
         nameToJsonFileMap = FileMapper.getFileMapByName(cp.getSimulationFolder(), cp.getSimulationName(), MySystem.ClustersFileExtension);
         nameToJsonFileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
+
+        allRunsClusterInfoMap = FileMapper.getAllRunsClusterMap(cp.getSimulationName(), nameToJsonFileMap);
+
         System.out.println("aici");
-
-
-//        Path clustersFile;
-//        String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
-//        Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile);
-
-
     }
 
 }

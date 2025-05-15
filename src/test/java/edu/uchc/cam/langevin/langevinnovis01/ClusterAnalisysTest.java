@@ -59,12 +59,19 @@ public class ClusterAnalisysTest {
         cp.setSimulationName(sim_base_name);
         Map<String, Integer> molecules = ConsolidationPostprocessor.getMolecules(g);
 
+        // this part is to test loading through assertions; can be commented out once it's stable since we
+        // do all the work again in ConsolidationPostprocessor.calculateLangevinAdvancedStatistics();
         ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
         cai.readInputFiles(cp);
 
         Map<String, File> nameToJsonFileMap = cai.getNameToJsonFileMap();
         Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap = cai.getAllRunsClusterInfoMap();
         assertTrue(NumRuns == nameToJsonFileMap.size(), "number of .json files should be equal to " + NumRuns);
+        assertTrue(NumRuns == allRunsClusterInfoMap.size(), "number of .json files should be equal to " + NumRuns);
+
+
+        cp.calculateLangevinAdvancedStatistics();
+
 
         System.out.println("done");
     }

@@ -1,5 +1,8 @@
 package edu.uchc.cam.langevin.helpernovis;
 
+import org.vcell.data.LangevinPostprocessor;
+import org.vcell.data.NdJsonUtils;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -91,6 +94,33 @@ public class FileMapper {
         return fileMap;
     }
 
+    /*
+     * read the name to Ida file map, use it to make the solver result set map
+     *    key = run index (first index is 0)
+     *    value = solver result set for the run with that index
+     */
+    public static Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> getAllRunsClusterMap(String prefix, Map<String, File> fileMap) throws IOException {
+
+        Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap = new TreeMap<>();
+
+        Pattern pattern = Pattern.compile("^" + prefix + "(?:_(\\d+))?" + "$");
+
+        for (Map.Entry<String, File> entry : fileMap.entrySet()) {
+            String fileName = entry.getKey();
+            File file = entry.getValue();
+
+            Matcher matcher = pattern.matcher(fileName);
+            if (matcher.matches()) {
+                int key = matcher.group(1) == null ? 0 : Integer.parseInt(matcher.group(1)); // base file is key=0
+
+                Map<Double, LangevinPostprocessor.TimePointClustersInfo> currentClusterInfoMap =
+                            NdJsonUtils.loadClusterInfoMapFromNDJSON(file.toPath());
+                allRunsClusterInfoMap.put(key, currentClusterInfoMap);
+
+            }
+        }
+        return allRunsClusterInfoMap;
+    }
 //    public static void parseFile(File file, List<ColumnDescription> columnDescriptions, ArrayList<double[]> values) throws IOException {
 //        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 //            // read the first line (column names)

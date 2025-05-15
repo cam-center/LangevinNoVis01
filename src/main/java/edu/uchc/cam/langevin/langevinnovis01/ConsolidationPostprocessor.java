@@ -7,8 +7,6 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.g.object.GMolecule;
-import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
-import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
@@ -26,7 +24,7 @@ public class ConsolidationPostprocessor {
     private String simulationName;          // model / simulation name (without extension)
     private File simulationFolder;          // top folder, where the input file is (and also the .ida and ,json files are)
 
-    List<Double> timeInSeconds = null;      // used in ClusterAnalysis
+    List<Double> timeInSecondsList = null;      // used in ClusterAnalysis
 
 
     public ConsolidationPostprocessor(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging) {
@@ -84,7 +82,7 @@ public class ConsolidationPostprocessor {
         Map<Integer, SolverResultSet> solverResultSetMap = cpi.getSolverResultSetMap();
 
         SolverResultSet tempSolverResultSet = solverResultSetMap.get(0);
-        timeInSeconds = tempSolverResultSet.getColumn(SolverResultSet.TIME_COLUMN);
+        timeInSecondsList = tempSolverResultSet.getColumn(SolverResultSet.TIME_COLUMN);
 
         // the output result sets
         SolverResultSet averagesResultSet = SolverResultSet.deepCopy(tempSolverResultSet, SolverResultSet.DuplicateMode.ZeroInitialize);
@@ -140,7 +138,7 @@ public class ConsolidationPostprocessor {
     }
 
     // ---------------------------------------------------------------------------------------------
-    public void calculateLangevinAdvancedStatistics() throws FileNotFoundException {
+    public void calculateLangevinAdvancedStatistics() throws IOException {
 
         Map<String, Integer> moleculesMap = getMolecules(g);
         ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
@@ -151,9 +149,18 @@ public class ConsolidationPostprocessor {
 
 
 
-        int numTimePoints = timeInSeconds.size();   // number of timepoints
+        int numTimePoints = timeInSecondsList.size();   // number of timepoints
 
-        for(int time = 0; time < numTimePoints; time++) {
+        for(int timepointIndex = 0; timepointIndex < numTimePoints; timepointIndex++) {     // index of current timepoint
+            double currentTimepointValue = timeInSecondsList.get(timepointIndex);           // value of current timepoint (in sec)
+            for(int runIndex = 0; runIndex < numRuns; runIndex++) {
+                Map<Double, LangevinPostprocessor.TimePointClustersInfo> currentRunClusterInfoMap = allRunsClusterInfoMap.get(runIndex);
+                LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = currentRunClusterInfoMap.get(currentTimepointValue);
+
+
+
+
+            }
 
         }
 
