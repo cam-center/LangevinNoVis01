@@ -39,7 +39,7 @@ public class ClusterAnalisysTest {
     public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis/sim_Folder/data";
     public static final String sim_base_name = "sim";
 
-    public static final int NumRuns = 4;
+    public static final int NumRuns = 6;
     public static final String ClustersFileExtension = ".json";
 
 // --------------------------------------------------------------------------

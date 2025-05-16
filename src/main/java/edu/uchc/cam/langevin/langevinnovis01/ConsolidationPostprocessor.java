@@ -139,56 +139,49 @@ public class ConsolidationPostprocessor {
 
     public void calculateLangevinAdvancedStatistics() throws IOException {
 
-        Map<String, Integer> moleculesMap = getMolecules(g);
         ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
         cai.readInputFiles(this);
 
-        Map<String, File> nameToJsonFileMap = cai.getNameToJsonFileMap();   // probably not needed
         List<Double> timeInSecondsList = cai.getTimeInSecondsList();
-
         int numTimePoints = timeInSecondsList.size();
         int totalMolecules = getTotalMolecules(g);
 
-        Map<Integer, Map<Double, ClusterStatisticsCalculator.Statistics>> perRunStatistics = new LinkedHashMap<>();
+        Map<Double, Map<Integer, ClusterStatisticsCalculator.Statistics>> perTimepointPerRunStatistics = new LinkedHashMap<>(); // results for individual runs
+        Map<Double, ClusterStatisticsCalculator.Statistics> perTimepointMeanRunStatistics = new LinkedHashMap<>();              // results for mean run
+        Map<Double, ClusterStatisticsCalculator.Statistics> perTimepointOverallRunStatistics = new LinkedHashMap<>();           // results for overall run
 
-        // Step 1: Compute Individual Run Statistics
-        for (int runIndex = 0; runIndex < numRuns; runIndex++) {
-            for (int timepointIndex = 0; timepointIndex < numTimePoints; timepointIndex++) {
-                double currentTimepointValue = timeInSecondsList.get(timepointIndex);
-                double timeAtIndex = timeInSecondsList.get(timepointIndex);
-                LangevinPostprocessor.TimePointClustersInfo clusterInfo = cai.getRow(timeAtIndex, runIndex);
+        for (int timepointIndex = 0; timepointIndex < numTimePoints; timepointIndex++) {
+            double currentTimepointValue = timeInSecondsList.get(timepointIndex);
+            Map<Integer, LangevinPostprocessor.TimePointClustersInfo> allRunsAtTimepoint = cai.getRow(currentTimepointValue);
 
+            Map<Integer, ClusterStatisticsCalculator.Statistics> runStatisticsMap = new LinkedHashMap<>();  // compute Individual run statistics
+            for (Map.Entry<Integer, LangevinPostprocessor.TimePointClustersInfo> entry : allRunsAtTimepoint.entrySet()) {
+
+                int runIndex = entry.getKey();
+                LangevinPostprocessor.TimePointClustersInfo clusterInfo = entry.getValue();
                 ClusterStatisticsCalculator.Statistics stats = ClusterStatisticsCalculator.computeIndividualRunStatistics(clusterInfo, totalMolecules);
-                perRunStatistics.computeIfAbsent(runIndex, k -> new LinkedHashMap<>()).put(currentTimepointValue, stats);
-                System.out.println(timepointIndex + ": " + currentTimepointValue);
-                if(timepointIndex == 98) {
-                    System.out.println("aici");
-                }
+                runStatisticsMap.put(runIndex, stats);
             }
+            perTimepointPerRunStatistics.put(currentTimepointValue, runStatisticsMap);
+
+            ClusterStatisticsCalculator.Statistics overallStats = ClusterStatisticsCalculator.computeOverallRunStatistics(
+                    allRunsAtTimepoint, totalMolecules);
+            perTimepointOverallRunStatistics.put(currentTimepointValue, overallStats);
+
+            ClusterStatisticsCalculator.Statistics meanStats = ClusterStatisticsCalculator.computeMeanRunStatistics(
+                    runStatisticsMap, numRuns);
+            perTimepointMeanRunStatistics.put(currentTimepointValue, meanStats);
+
+            // Output results for debugging
+//            if(timepointIndex == 98) {
+//                System.out.println("\nTimepoint: " + currentTimepointValue);
+//                System.out.println("Overall Run Statistics -> " + overallStats);
+//                System.out.println("Mean Run Statistics -> " + meanStats);
+//
+//                runStatisticsMap.forEach((run, stats) ->
+//                        System.out.println("Run " + run + " -> " + stats));
+//            }
         }
-
-        // Step 2: Compute Overall Run Statistics (Per Timepoint)
-        Map<Double, ClusterStatisticsCalculator.Statistics> overallRunStatistics =
-                ClusterStatisticsCalculator.computeOverallRunStatistics(cai.getAllRunsClusterInfoMap(), totalMolecules);
-
-        // Step 3: Compute Mean Run Statistics (Per Timepoint)
-        Map<Double, ClusterStatisticsCalculator.Statistics> meanRunStatistics =
-                ClusterStatisticsCalculator.computeMeanRunStatistics(perRunStatistics, numRuns);
-
-        // Output Example - Logging the computed statistics
-        System.out.println("Individual Run Statistics:");
-        perRunStatistics.forEach((run, statsMap) -> {
-            System.out.println("Run: " + run);
-            statsMap.forEach((time, stats) -> System.out.println("Time: " + time + " -> " + stats));
-        });
-
-        System.out.println("\nOverall Run Statistics:");
-        overallRunStatistics.forEach((time, stats) -> System.out.println("Time: " + time + " -> " + stats));
-
-        System.out.println("\nMean Run Statistics:");
-        meanRunStatistics.forEach((time, stats) -> System.out.println("Time: " + time + " -> " + stats));
-
-        System.out.println("finished cluster analizer");
     }
 
 

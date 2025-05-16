@@ -26,43 +26,44 @@ public class ClusterStatisticsCalculator {
         }
     }
 
-    public static Statistics computeIndividualRunStatistics(LangevinPostprocessor.TimePointClustersInfo clusterInfo, int totalMolecules) {
-        Statistics stats = new Statistics();
+    public static ClusterStatisticsCalculator.Statistics computeIndividualRunStatistics(
+            LangevinPostprocessor.TimePointClustersInfo clusterInfo, int totalMolecules) {
 
-        int totalClusters = clusterInfo.timePointTotalClusters;  // Includes trivial clusters
+        ClusterStatisticsCalculator.Statistics stats = new ClusterStatisticsCalculator.Statistics();
+
+        int totalClusters = clusterInfo.timePointTotalClusters;
         int totalNonTrivialMolecules = clusterInfo.timePointClusterInfoList.stream()
                 .mapToInt(cluster -> cluster.size)
                 .sum();
-        int trivialClusters = totalMolecules - totalNonTrivialMolecules;  // Derived from missing molecules
+        int trivialClusters = totalMolecules - totalNonTrivialMolecules; // Derived from missing molecules
+
         List<Integer> clusterSizes = clusterInfo.timePointClusterInfoList.stream()
                 .map(cluster -> cluster.size)
                 .collect(Collectors.toList());
 
-        // Compute fractional frequency (considering both trivial and non-trivial clusters)
+        // FF (including trivial clusters)
         Map<Integer, Long> sizeCounts = clusterSizes.stream()
                 .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
 
-        sizeCounts.put(1, (long) trivialClusters);  // Explicitly adding trivial clusters to the distribution
+        sizeCounts.put(1, (long) trivialClusters); // Explicitly adding trivial clusters
 
         stats.fractionalFrequency = sizeCounts.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> (double) e.getValue() / totalClusters));
 
-        // Compute ACS (Average Cluster Size)
-        stats.averageClusterSize = sizeCounts.entrySet().stream()
-                .mapToDouble(e -> e.getKey() * (e.getValue() / (double) totalClusters))
-                .sum();
+        // ACS
+        stats.averageClusterSize = totalMolecules / (double) totalClusters;
 
-        // Compute Fraction of Total Molecules (Fotm)
+        // FOTM
         stats.fractionOfTotalMolecules = sizeCounts.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey,
                         e -> (e.getKey() * e.getValue()) / (double) totalMolecules));
 
-        // Compute Average Cluster Occupancy (ACO)
+        // ACO
         stats.averageClusterOccupancy = stats.fractionOfTotalMolecules.entrySet().stream()
                 .mapToDouble(e -> e.getKey() * e.getValue())
                 .sum();
 
-        // Compute Standard Deviation (SD)
+        // SD
         double mean = stats.averageClusterSize;
         double variance = sizeCounts.entrySet().stream()
                 .mapToDouble(e -> e.getValue() * Math.pow(e.getKey() - mean, 2))
@@ -72,48 +73,130 @@ public class ClusterStatisticsCalculator {
         return stats;
     }
 
-    public static Map<Double, Statistics> computeOverallRunStatistics(Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap, int totalMolecules) {
-        Map<Double, Statistics> overallStats = new LinkedHashMap<>();
+    public static ClusterStatisticsCalculator.Statistics computeOverallRunStatistics(
+            Map<Integer, LangevinPostprocessor.TimePointClustersInfo> allRunsAtTimepoint, int totalMoleculesPerRun) {
 
-        for (Map<Double, LangevinPostprocessor.TimePointClustersInfo> runData : allRunsClusterInfoMap.values()) {
-            for (Map.Entry<Double, LangevinPostprocessor.TimePointClustersInfo> entry : runData.entrySet()) {
-                double timepoint = entry.getKey();
-                LangevinPostprocessor.TimePointClustersInfo clusterInfo = entry.getValue();
+        int numRuns = allRunsAtTimepoint.size();
+        ClusterStatisticsCalculator.Statistics overallStats = new ClusterStatisticsCalculator.Statistics();
 
-                overallStats.computeIfAbsent(timepoint, k -> new Statistics());
+        List<Integer> aggregatedClusterSizes = new ArrayList<>();
+        int totalNonTrivialMolecules = 0;
 
-                Statistics timePointStats = computeIndividualRunStatistics(clusterInfo, totalMolecules);
-                mergeStatistics(overallStats.get(timepoint), timePointStats);
-            }
+        // merge data from all Runs at this timepoint
+        int totalClusters = allRunsAtTimepoint.values().stream()
+                .mapToInt(clusterInfo -> clusterInfo.timePointTotalClusters)
+                .sum();
+
+        for (LangevinPostprocessor.TimePointClustersInfo clusterInfo : allRunsAtTimepoint.values()) {
+            int nonTrivialMolecules = clusterInfo.timePointClusterInfoList.stream()
+                    .mapToInt(cluster -> cluster.size)
+                    .sum();
+            totalNonTrivialMolecules += nonTrivialMolecules;
+
+            clusterInfo.timePointClusterInfoList.stream()
+                    .map(cluster -> cluster.size)
+                    .forEach(aggregatedClusterSizes::add);
         }
+
+        int totalMoleculesAcrossRuns = totalMoleculesPerRun * numRuns;
+        int trivialClusters = Math.max(0, totalMoleculesAcrossRuns - totalNonTrivialMolecules);
+
+        // FF (fractional frequency - including trivial clusters)
+        Map<Integer, Long> sizeCounts = aggregatedClusterSizes.stream()
+                .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+
+        sizeCounts.put(1, (long) trivialClusters); // explicitly adding trivial clusters
+
+        final int finalTotalClusters = totalClusters; // lambda expression needs effectively final variable
+        overallStats.fractionalFrequency = sizeCounts.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> (double) e.getValue() / finalTotalClusters));
+
+        // ACS (Average Cluster Size)
+        overallStats.averageClusterSize = totalMoleculesAcrossRuns / (double) finalTotalClusters;
+
+        // FOTM (Fraction of Total Molecules)
+        overallStats.fractionOfTotalMolecules = sizeCounts.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> (e.getKey() * e.getValue()) / (double) totalMoleculesAcrossRuns));
+
+        // ACO (Average Cluster Occupancy)
+        overallStats.averageClusterOccupancy = overallStats.fractionOfTotalMolecules.entrySet().stream()
+                .mapToDouble(e -> e.getKey() * e.getValue())
+                .sum();
+
+        // SD (Standard Deviation)
+        double mean = overallStats.averageClusterSize;
+        double variance = sizeCounts.entrySet().stream()
+                .mapToDouble(e -> e.getValue() * Math.pow(e.getKey() - mean, 2))
+                .sum() / finalTotalClusters;
+        overallStats.standardDeviation = Math.sqrt(variance);
 
         return overallStats;
     }
 
-    public static Map<Double, Statistics> computeMeanRunStatistics(Map<Integer, Map<Double, Statistics>> perRunStatistics, int numRuns) {
-        Map<Double, Statistics> meanRunStats = new LinkedHashMap<>();
+//    public static Map<Double, ClusterStatisticsCalculator.Statistics> computeMeanRunStatistics(
+//            Map<Double, Map<Integer, ClusterStatisticsCalculator.Statistics>> perTimepointPerRunStatistics, int numRuns) {
+//
+//        Map<Double, ClusterStatisticsCalculator.Statistics> meanRunStats = new LinkedHashMap<>();
+//
+//        for (Map.Entry<Double, Map<Integer, ClusterStatisticsCalculator.Statistics>> timepointEntry : perTimepointPerRunStatistics.entrySet()) {
+//            double timepoint = timepointEntry.getKey();
+//            Map<Integer, ClusterStatisticsCalculator.Statistics> runStatsMap = timepointEntry.getValue();
+//
+//            ClusterStatisticsCalculator.Statistics meanStats = new ClusterStatisticsCalculator.Statistics();
+//
+//            // compute Mean ACS and ACO
+//            double sumACS = 0.0, sumACO = 0.0;
+//            List<Double> acsValues = new ArrayList<>();
+//
+//            for (ClusterStatisticsCalculator.Statistics runStats : runStatsMap.values()) {
+//                sumACS += runStats.averageClusterSize;
+//                sumACO += runStats.averageClusterOccupancy;
+//                acsValues.add(runStats.averageClusterSize);  // needed for SD computation
+//            }
+//
+//            meanStats.averageClusterSize = sumACS / numRuns;
+//            meanStats.averageClusterOccupancy = sumACO / numRuns;
+//
+//            // compute Standard Deviation for ACS (across runs, per timepoint)
+//            double varianceACS = acsValues.stream()
+//                    .mapToDouble(acs -> Math.pow(acs - meanStats.averageClusterSize, 2))
+//                    .sum() / numRuns;
+//            meanStats.standardDeviation = Math.sqrt(varianceACS);
+//
+//            meanRunStats.put(timepoint, meanStats);
+//        }
+//        return meanRunStats;
+//    }
 
-        for (Map<Double, Statistics> runData : perRunStatistics.values()) {
-            for (Map.Entry<Double, Statistics> entry : runData.entrySet()) {
-                double timepoint = entry.getKey();
-                Statistics runStats = entry.getValue();
+    // TODO: check this !!!
+    public static ClusterStatisticsCalculator.Statistics computeMeanRunStatistics(
+            Map<Integer, ClusterStatisticsCalculator.Statistics> runStatisticsMap, int numRuns) {
 
-                meanRunStats.computeIfAbsent(timepoint, k -> new Statistics());
+        ClusterStatisticsCalculator.Statistics meanStats = new ClusterStatisticsCalculator.Statistics();
 
-                Statistics meanStats = meanRunStats.get(timepoint);
-                meanStats.averageClusterSize += runStats.averageClusterSize / numRuns;
-                meanStats.averageClusterOccupancy += runStats.averageClusterOccupancy / numRuns;
+        double sumACS = 0.0, sumACO = 0.0;
+        List<Double> acsValues = new ArrayList<>();
 
-                // Compute SD for Mean Run using ACS values from all runs
-                double variance = perRunStatistics.values().stream()
-                        .mapToDouble(r -> Math.pow(r.get(timepoint).averageClusterSize - meanStats.averageClusterSize, 2))
-                        .sum() / numRuns;
-                meanStats.standardDeviation = Math.sqrt(variance);
-            }
+        for (ClusterStatisticsCalculator.Statistics runStats : runStatisticsMap.values()) {
+            sumACS += runStats.averageClusterSize;
+            sumACO += runStats.averageClusterOccupancy;
+            acsValues.add(runStats.averageClusterSize); // For SD calculation
         }
 
-        return meanRunStats;
+        meanStats.averageClusterSize = sumACS / numRuns;
+        meanStats.averageClusterOccupancy = sumACO / numRuns;
+
+        // Compute Standard Deviation for ACS
+        double varianceACS = acsValues.stream()
+                .mapToDouble(acs -> Math.pow(acs - meanStats.averageClusterSize, 2))
+                .sum() / numRuns;
+        meanStats.standardDeviation = Math.sqrt(varianceACS);
+
+        return meanStats;
     }
+
+
 
     private static void mergeStatistics(Statistics overallStats, Statistics individualStats) {
         overallStats.averageClusterSize += individualStats.averageClusterSize;

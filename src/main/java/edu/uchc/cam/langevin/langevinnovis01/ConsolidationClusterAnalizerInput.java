@@ -41,9 +41,18 @@ public class ConsolidationClusterAnalizerInput {
         allRunsClusterInfoMap = FileMapper.getAllRunsClusterMap(cp.getSimulationName(), nameToJsonFileMap);
     }
 
-    public LangevinPostprocessor.TimePointClustersInfo getRow(double timepointIndex, int runIndex) {
+    public Map<Integer, LangevinPostprocessor.TimePointClustersInfo> getRow(double currentTimepointValue) {
+        Map<Integer, LangevinPostprocessor.TimePointClustersInfo> allRunsRowMap = new LinkedHashMap<> ();
+        for(int runIndex = 0; runIndex < allRunsClusterInfoMap.size(); runIndex++) {
+            Map<Double, LangevinPostprocessor.TimePointClustersInfo> currentRunClusterInfoMap = allRunsClusterInfoMap.get(runIndex);
+            LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = currentRunClusterInfoMap.get(currentTimepointValue);
+            allRunsRowMap.put(runIndex, timePointClustersInfo);
+        }
+        return allRunsRowMap;
+    }
+    public LangevinPostprocessor.TimePointClustersInfo getRow(double currentTimepointValue, int runIndex) {
         Map<Double, LangevinPostprocessor.TimePointClustersInfo> currentRunClusterInfoMap = allRunsClusterInfoMap.get(runIndex);
-        LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = currentRunClusterInfoMap.get(timepointIndex);
+        LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = currentRunClusterInfoMap.get(currentTimepointValue);
         return timePointClustersInfo;
     }
 
