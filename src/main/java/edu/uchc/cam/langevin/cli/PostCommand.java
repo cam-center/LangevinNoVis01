@@ -86,6 +86,7 @@ public class PostCommand implements Callable<Integer> {
         cp.calculateLangevinPrimaryStatistics();
         cp.calculateLangevinAdvancedStatistics();
 
+        modelFile = null;
         return 0;
     }
 }

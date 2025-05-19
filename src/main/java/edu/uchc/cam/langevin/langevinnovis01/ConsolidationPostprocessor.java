@@ -132,10 +132,9 @@ public class ConsolidationPostprocessor {
             }
         }
         ConsolidationPostprocessorOutput cpo = new ConsolidationPostprocessorOutput(this);
-        cpo.writeResultFiles(averagesResultSet, stdResultSet, minResultSet,maxResultSet);
+        cpo.writeResultFiles(averagesResultSet, stdResultSet, minResultSet, maxResultSet);
     }
 
-    // ---------------------------------------------------------------------------------------------
 
     public void calculateLangevinAdvancedStatistics() throws IOException {
 
@@ -171,17 +170,15 @@ public class ConsolidationPostprocessor {
             ClusterStatisticsCalculator.Statistics meanStats = ClusterStatisticsCalculator.computeMeanRunStatistics(
                     runStatisticsMap, numRuns);
             perTimepointMeanRunStatistics.put(currentTimepointValue, meanStats);
-
-            // Output results for debugging
-//            if(timepointIndex == 98) {
-//                System.out.println("\nTimepoint: " + currentTimepointValue);
-//                System.out.println("Overall Run Statistics -> " + overallStats);
-//                System.out.println("Mean Run Statistics -> " + meanStats);
-//
-//                runStatisticsMap.forEach((run, stats) ->
-//                        System.out.println("Run " + run + " -> " + stats));
-//            }
         }
+
+        ConsolidationClusterAnalizerOutput cao = new ConsolidationClusterAnalizerOutput(this);
+        cao.writeOutput(perTimepointOverallRunStatistics, perTimepointMeanRunStatistics);
+//        cao.writeOutput(perTimepointPerRunStatistics,
+//            ConsolidationClusterAnalizerOutput.RunStatisticsOutputMode.BY_RUN_BY_TIMEPOINT);
+//        cao.writeOutput(perTimepointPerRunStatistics,
+//            ConsolidationClusterAnalizerOutput.RunStatisticsOutputMode.BY_TIMEPOINT_BY_RUN);
+
     }
 
 
