@@ -134,42 +134,6 @@ public class ClusterStatisticsCalculator {
         return overallStats;
     }
 
-//    public static Map<Double, ClusterStatisticsCalculator.Statistics> computeMeanRunStatistics(
-//            Map<Double, Map<Integer, ClusterStatisticsCalculator.Statistics>> perTimepointPerRunStatistics, int numRuns) {
-//
-//        Map<Double, ClusterStatisticsCalculator.Statistics> meanRunStats = new LinkedHashMap<>();
-//
-//        for (Map.Entry<Double, Map<Integer, ClusterStatisticsCalculator.Statistics>> timepointEntry : perTimepointPerRunStatistics.entrySet()) {
-//            double timepoint = timepointEntry.getKey();
-//            Map<Integer, ClusterStatisticsCalculator.Statistics> runStatsMap = timepointEntry.getValue();
-//
-//            ClusterStatisticsCalculator.Statistics meanStats = new ClusterStatisticsCalculator.Statistics();
-//
-//            // compute Mean ACS and ACO
-//            double sumACS = 0.0, sumACO = 0.0;
-//            List<Double> acsValues = new ArrayList<>();
-//
-//            for (ClusterStatisticsCalculator.Statistics runStats : runStatsMap.values()) {
-//                sumACS += runStats.averageClusterSize;
-//                sumACO += runStats.averageClusterOccupancy;
-//                acsValues.add(runStats.averageClusterSize);  // needed for SD computation
-//            }
-//
-//            meanStats.averageClusterSize = sumACS / numRuns;
-//            meanStats.averageClusterOccupancy = sumACO / numRuns;
-//
-//            // compute Standard Deviation for ACS (across runs, per timepoint)
-//            double varianceACS = acsValues.stream()
-//                    .mapToDouble(acs -> Math.pow(acs - meanStats.averageClusterSize, 2))
-//                    .sum() / numRuns;
-//            meanStats.standardDeviation = Math.sqrt(varianceACS);
-//
-//            meanRunStats.put(timepoint, meanStats);
-//        }
-//        return meanRunStats;
-//    }
-
-    // TODO: check this !!!
     public static ClusterStatisticsCalculator.Statistics computeMeanRunStatistics(
             Map<Integer, ClusterStatisticsCalculator.Statistics> runStatisticsMap, int numRuns) {
 
@@ -196,8 +160,6 @@ public class ClusterStatisticsCalculator {
         return meanStats;
     }
 
-
-
     private static void mergeStatistics(Statistics overallStats, Statistics individualStats) {
         overallStats.averageClusterSize += individualStats.averageClusterSize;
         overallStats.averageClusterOccupancy += individualStats.averageClusterOccupancy;
@@ -209,6 +171,5 @@ public class ClusterStatisticsCalculator {
         individualStats.fractionOfTotalMolecules.forEach((size, fotm) ->
                 overallStats.fractionOfTotalMolecules.merge(size, fotm, Double::sum));
     }
-
 
 }

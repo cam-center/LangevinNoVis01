@@ -171,9 +171,6 @@ public class LangevinPostprocessor {
 
         String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
         NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, clustersFile);
-
-        // check loader. move this to a test
-        Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile);
     }
 
     // trivial cluster = single molecules

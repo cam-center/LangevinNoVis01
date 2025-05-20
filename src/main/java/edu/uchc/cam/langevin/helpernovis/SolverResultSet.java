@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class SolverResultSet implements Serializable {
+public class SolverResultSet {
 
     public static final String TIME = "t";
     public static final String TIME_COLUMN = TIME;

@@ -1,11 +1,9 @@
 package edu.uchc.cam.langevin.helpernovis;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
-@SuppressWarnings("serial")
-public class ColumnDescription implements Serializable {
+public class ColumnDescription {
 
     private String variableName = new String();
     private transient boolean isTrivial = false;
