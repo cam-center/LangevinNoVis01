@@ -171,6 +171,7 @@ public class ConsolidationPostprocessor {
                     runStatisticsMap, numRuns);
             perTimepointMeanRunStatistics.put(currentTimepointValue, meanStats);
         }
+        int maxClusterSize = ClusterStatisticsCalculator.getMaxClusterSize(perTimepointMeanRunStatistics);
 
         ConsolidationClusterAnalizerOutput cao = new ConsolidationClusterAnalizerOutput(this);
         cao.writeOutput(perTimepointOverallRunStatistics, perTimepointMeanRunStatistics);
