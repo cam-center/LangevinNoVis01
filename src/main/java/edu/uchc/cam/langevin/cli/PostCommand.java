@@ -1,8 +1,6 @@
 package edu.uchc.cam.langevin.cli;
 
-import edu.uchc.cam.langevin.langevinnovis01.ConsolidationPostprocessor;
-import edu.uchc.cam.langevin.langevinnovis01.Global;
-import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import edu.uchc.cam.langevin.langevinnovis01.*;
 import org.vcell.messaging.*;
 import picocli.CommandLine;
 
@@ -85,7 +83,10 @@ public class PostCommand implements Callable<Integer> {
             cp = new ConsolidationPostprocessor(g, numRuns, true, vcellMessaging);
         }
 
-        cp.runConsolidation();
+        cp.calculateLangevinPrimaryStatistics();
+        cp.calculateLangevinAdvancedStatistics();
+
+        modelFile = null;
         return 0;
     }
 }

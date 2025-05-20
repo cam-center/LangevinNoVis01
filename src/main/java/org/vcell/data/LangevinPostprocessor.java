@@ -171,29 +171,27 @@ public class LangevinPostprocessor {
 
         String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
         NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, clustersFile);
-
-        // check loader. move this to a test
-        Map<Double, TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile);
     }
 
-
-    static class TimePointClustersInfo implements Serializable {
+    // trivial cluster = single molecules
+    // non-trivial cluster = 2 molecules or more (bound together)
+    public static class TimePointClustersInfo implements Serializable {
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("timePointTotalClusters")
-        int timePointTotalClusters;                     // total clusters at this timepoint (trivial + non-trivial)
+        public int timePointTotalClusters;                     // total clusters at this timepoint (trivial + non-trivial)
 
         @JsonProperty("timePointClusterInfoList")
-        List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
+        public List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
     }
-    static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
+    public static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
         private static final long serialVersionUID = 1L;
 
         @JsonProperty("clusterIndex")
         int clusterIndex = -1;
 
         @JsonProperty("size")
-        int size = 0;
+        public int size = 0;
 
         @JsonProperty("clusterComponents")
         Map<String, Integer> clusterComponents = new LinkedHashMap<>(); // key = molecule name, value = number of molecules in the cluster
