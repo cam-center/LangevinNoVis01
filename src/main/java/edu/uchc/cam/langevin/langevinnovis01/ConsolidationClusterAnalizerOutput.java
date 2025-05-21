@@ -1,5 +1,6 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -26,9 +27,11 @@ public class ConsolidationClusterAnalizerOutput {
                             Map<Double, ClusterStatisticsCalculator.Statistics> perTimepointMeanRunStatistics) {
         File overallResults = new File(simulationFolder, simulationName + "_clusters" + "_overall.csv");
         File meanResults = new File(simulationFolder, simulationName + "_clusters" + "_mean.csv");
+        File countResults = new File(simulationFolder, simulationName + "_clusters_counts.csv");
 
         writeStatisticsToFile(overallResults, perTimepointOverallRunStatistics);
         writeStatisticsToFile(meanResults, perTimepointMeanRunStatistics);
+        writeClusterSizeFrequencyToFile(countResults, perTimepointMeanRunStatistics);
     }
 
     // write individual run statistics
@@ -83,7 +86,33 @@ public class ConsolidationClusterAnalizerOutput {
 
     // -----------------------------------------------------------------------------------------------------------
 
-    // helper for overall and mean statistics
+    // helper for cluster counts, overall and mean statistics
+    private void writeClusterSizeFrequencyToFile(File file, Map<Double, ClusterStatisticsCalculator.Statistics> statisticsMap) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            // write header with cluster sizes directly from the pre-padded map
+            writer.write("t");
+            statisticsMap.values().iterator().next().clusterSizeFrequencyMap.keySet().forEach(size -> {
+                try {
+                    writer.write("," + size);
+                } catch (IOException e) {
+                    throw new RuntimeException("Error writing header: ", e);
+                }
+            });
+            writer.newLine();
+
+            // write frequency data for each timepoint
+            for (Map.Entry<Double, ClusterStatisticsCalculator.Statistics> entry : statisticsMap.entrySet()) {
+                writer.write(entry.getKey().toString()); // timepoint
+                for (Double freq : entry.getValue().clusterSizeFrequencyMap.values()) {
+                    writer.write("," + freq);
+                }
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error writing cluster size frequency CSV: " + e.getMessage());
+        }
+    }
+
     private void writeStatisticsToFile(File file, Map<Double, ClusterStatisticsCalculator.Statistics> statisticsMap) {
         try (FileWriter writer = new FileWriter(file)) {
             writer.write("t, ACS, SD, ACO\n");

@@ -193,22 +193,15 @@ public class ClusterStatisticsCalculator {
         return meanStats;
     }
 
-    private static void mergeStatistics(Statistics overallStats, Statistics individualStats) {
-        overallStats.averageClusterSize += individualStats.averageClusterSize;
-        overallStats.averageClusterOccupancy += individualStats.averageClusterOccupancy;
-        overallStats.standardDeviation += individualStats.standardDeviation;
+    // TODO: for the future: keep counts with how many time each reaction was triggered for each timepoint
+    //  (it's the FREE in the peimary statistics)
 
-        individualStats.fractionalFrequency.forEach((size, freq) ->
-                overallStats.fractionalFrequency.merge(size, freq, Double::sum));
-
-        individualStats.fractionOfTotalMolecules.forEach((size, fotm) ->
-                overallStats.fractionOfTotalMolecules.merge(size, fotm, Double::sum));
-    }
-
-    public static void normalizeClusterFrequencies(Map<Integer, ClusterStatisticsCalculator.Statistics> allStats, int maxClusterSize) {
+    // we ignore trivial clusters, we'll have that info elsewhere with separate counts per each molecule
+    // to detect depletion
+    public static void fillEmptyClusterFrequencies(Map<?, ClusterStatisticsCalculator.Statistics> allStats, int maxClusterSize) {
         // ensure all frequency maps include every cluster size up to maxClusterSize
         for (ClusterStatisticsCalculator.Statistics stats : allStats.values()) {
-            for (int size = 1; size <= maxClusterSize; size++) {
+            for (int size = 2; size <= maxClusterSize; size++) {
                 stats.clusterSizeFrequencyMap.putIfAbsent(size, 0.0);           // fill missing sizes with 0
                 stats.normalizedClusterSizeFrequencyMap.putIfAbsent(size, 0.0);
             }

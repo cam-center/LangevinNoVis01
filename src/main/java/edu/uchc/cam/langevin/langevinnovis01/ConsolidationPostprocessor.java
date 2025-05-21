@@ -171,8 +171,16 @@ public class ConsolidationPostprocessor {
                     runStatisticsMap, numRuns);
             perTimepointMeanRunStatistics.put(currentTimepointValue, meanStats);
         }
-        int maxClusterSize = ClusterStatisticsCalculator.getMaxClusterSize(perTimepointMeanRunStatistics);
 
+        // fill in all holes in clusterSizeFrequencyMap in preparation for file output
+        int maxClusterSize = ClusterStatisticsCalculator.getMaxClusterSize(perTimepointMeanRunStatistics);
+        perTimepointPerRunStatistics.forEach((timepoint, referenceStats) ->
+                ClusterStatisticsCalculator.fillEmptyClusterFrequencies(referenceStats, maxClusterSize)
+        );
+        ClusterStatisticsCalculator.fillEmptyClusterFrequencies(perTimepointOverallRunStatistics, maxClusterSize);
+        ClusterStatisticsCalculator.fillEmptyClusterFrequencies(perTimepointMeanRunStatistics, maxClusterSize);
+
+        // write all statistic to files
         ConsolidationClusterAnalizerOutput cao = new ConsolidationClusterAnalizerOutput(this);
         cao.writeOutput(perTimepointOverallRunStatistics, perTimepointMeanRunStatistics);
 //        cao.writeOutput(perTimepointPerRunStatistics,
