@@ -48,23 +48,23 @@ public class ClusterAnalisysTest {
  * The CliTest.testRunAndPostCommand is doing everything done here and more
  */
 
-    @Test
-    public void testRunClusterAnalysis() throws IOException {
-
-        VCellMessaging vcellMessaging = new VCellMessagingNoop();
-        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
-        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
-
-        Global g = new Global(modelFile);
-        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
-        cp.setSimulationFolder(simulationFolder);
-        cp.setNumRuns(NumRuns);
-        cp.setSimulationName(sim_base_name);
-
-        cp.calculateLangevinAdvancedStatistics();   // cluster analysis
-
-        System.out.println("done");
-    }
+//    @Test
+//    public void testRunClusterAnalysis() throws IOException {
+//
+//        VCellMessaging vcellMessaging = new VCellMessagingNoop();
+//        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
+//        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
+//
+//        Global g = new Global(modelFile);
+//        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
+//        cp.setSimulationFolder(simulationFolder);
+//        cp.setNumRuns(NumRuns);
+//        cp.setSimulationName(sim_base_name);
+//
+//        cp.calculateLangevinAdvancedStatistics();   // cluster analysis
+//
+//        System.out.println("done");
+//    }
 //
 //    @Test
 //    public void testReadJsonFiles() throws IOException {
