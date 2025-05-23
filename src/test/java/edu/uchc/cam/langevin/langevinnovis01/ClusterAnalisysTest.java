@@ -49,7 +49,7 @@ public class ClusterAnalisysTest {
  */
 
 //    @Test
-//    public void testRunClusterAnalisys() throws IOException {
+//    public void testRunClusterAnalysis() throws IOException {
 //
 //        VCellMessaging vcellMessaging = new VCellMessagingNoop();
 //        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
@@ -61,7 +61,7 @@ public class ClusterAnalisysTest {
 //        cp.setNumRuns(NumRuns);
 //        cp.setSimulationName(sim_base_name);
 //
-//        cp.calculateLangevinAdvancedStatistics();   // cluster analisys
+//        cp.calculateLangevinAdvancedStatistics();   // cluster analysis
 //
 //        System.out.println("done");
 //    }

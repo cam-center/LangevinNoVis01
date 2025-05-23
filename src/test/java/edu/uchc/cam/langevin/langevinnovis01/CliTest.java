@@ -217,6 +217,7 @@ public class CliTest {
             Path consolidated_Std = tempDirectory.resolve(sim_base_name + "_Std" + ".ida");
             Path clusters_Mean = tempDirectory.resolve(sim_base_name + "_clusters_mean" + ".csv");
             Path clusters_Overall = tempDirectory.resolve(sim_base_name + "_clusters_overall" + ".csv");
+            Path clusters_Counts = tempDirectory.resolve(sim_base_name + "_clusters_counts" + ".csv");
 
             String[] argsP = {       // command arguments, postprocessing run
                     "postprocess",
@@ -233,6 +234,7 @@ public class CliTest {
             assertEquals(true, consolidated_Std.toFile().exists(), consolidated_Std.toFile().getName() + " should exist");
             assertEquals(true, clusters_Mean.toFile().exists(), clusters_Mean.toFile().getName() + " should exist");
             assertEquals(true, clusters_Overall.toFile().exists(), clusters_Overall.toFile().getName() + " should exist");
+            assertEquals(true, clusters_Counts.toFile().exists(), clusters_Counts.toFile().getName() + " should exist");
 
             File fileToDelete = modelFile.toFile();
             int attempts = 0;
