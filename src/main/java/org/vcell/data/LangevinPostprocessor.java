@@ -183,6 +183,13 @@ public class LangevinPostprocessor {
 
         @JsonProperty("timePointClusterInfoList")
         public List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
+
+        public int getTimePointTotalClusters() {
+            return timePointTotalClusters;
+        }
+        public List<ClusterInfo> getTimePointClusterInfoList() {
+            return timePointClusterInfoList;
+        }
     }
     public static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
         private static final long serialVersionUID = 1L;
@@ -195,6 +202,10 @@ public class LangevinPostprocessor {
 
         @JsonProperty("clusterComponents")
         Map<String, Integer> clusterComponents = new LinkedHashMap<>(); // key = molecule name, value = number of molecules in the cluster
+
+        public int getClusterIndex() { return clusterIndex; }
+        public int getSize() { return size; }
+        public Map<String, Integer> getClusterComponents() { return clusterComponents; }
     }
 
     private static Map<String, Integer> getMolecules(Path langevinOutputDir) throws IOException {
