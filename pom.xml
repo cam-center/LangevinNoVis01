@@ -185,6 +185,7 @@
                             <fallback>false</fallback>
                             <buildArgs>
                                 <arg>--initialize-at-build-time=edu.uchc.cam.langevin.cli.Version --no-fallback -H:DashboardDump=fortune -H:+DashboardAll</arg>
+                                <arg>-H:ConfigurationFileDirectories=src/main/resources</arg>
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -226,6 +227,7 @@
                             <fallback>false</fallback>
                             <buildArgs>
                                 <arg>--static --libc=musl --initialize-at-build-time=edu.uchc.cam.langevin.cli.Version --no-fallback -H:DashboardDump=fortune -H:+DashboardAll</arg>
+                                <arg>-H:ConfigurationFileDirectories=src/main/resources</arg>
                             </buildArgs>
                         </configuration>
                     </plugin>
