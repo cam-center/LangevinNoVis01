@@ -190,6 +190,8 @@ public class LangevinPostprocessor {
         public List<ClusterInfo> getTimePointClusterInfoList() {
             return timePointClusterInfoList;
         }
+        public void setTimePointTotalClusters(int total) { this.timePointTotalClusters = total; }
+        public void setTimePointClusterInfoList(List<ClusterInfo> list) { this.timePointClusterInfoList = list; }
     }
     public static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
         private static final long serialVersionUID = 1L;
@@ -206,6 +208,16 @@ public class LangevinPostprocessor {
         public int getClusterIndex() { return clusterIndex; }
         public int getSize() { return size; }
         public Map<String, Integer> getClusterComponents() { return clusterComponents; }
+
+        public void setClusterIndex(int clusterIndex) {
+            this.clusterIndex = clusterIndex;
+        }
+        public void setSize(int size) {
+            this.size = size;
+        }
+        public void setClusterComponents(Map<String, Integer> clusterComponents) {
+            this.clusterComponents = clusterComponents;
+        }
     }
 
     private static Map<String, Integer> getMolecules(Path langevinOutputDir) throws IOException {
