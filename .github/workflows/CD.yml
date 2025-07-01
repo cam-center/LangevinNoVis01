@@ -73,3 +73,45 @@ jobs:
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
         if: ${{ failure() }}
+
+  MacUniversalBinary:
+    name: Langevin on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: CD
+    strategy:
+      matrix:
+        os: [macos-14]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: download langevin-macos-13 binary
+        uses: robinraju/release-downloader@v1
+        with:
+          tag: ${{ github.event.release.tag_name }}
+          fileName: langevin-macos-13
+          out-file-path: ./target/langevin-macos-13
+
+      - name: download langevin-macos-14 binary
+        uses: robinraju/release-downloader@v1
+        with:
+          tag: ${{ github.event.release.tag_name }}
+          fileName: langevin-macos-14
+          out-file-path: ./target/langevin-macos-14
+
+      - name: run lipo to create universal binary
+        run: lipo -create -output ./target/langevin-macos-universal ./target/langevin-macos-13 ./target/langevin-macos-14
+
+      - name: upload release asset as langevin-macos-universal
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./target/langevin-macos-universal
+          asset_name: langevin-macos-universal
+          asset_content_type: application/octet-stream
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ failure() }}
