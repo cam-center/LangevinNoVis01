@@ -35,6 +35,9 @@ public class ClusterAnalisysTest {
         directoryToBeDeleted.delete();
     }
 
+    // TODO: place some simulation results in the repository and properly invoke the tests on them
+    //  in a temp directory like we do in CliTest
+
     public static final String sim_base_name = "SimID_35189106_0_";     // use "sim" for small test
     //public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis;    // use this for small test
     public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2";
@@ -45,56 +48,55 @@ public class ClusterAnalisysTest {
     public static final int NumRuns = 50;           // for small test use 6
     public static final String ClustersFileExtension = ".json";
 
-// --------------------------------------------------------------------------
 /*
  *  These tests are needed just for debugging, not intended to be run automatically
  * The CliTest.testRunAndPostCommand is doing everything done here and more
  */
 
 //    @Test
-//    public void testRunClusterAnalysis() throws IOException {
-//
-//        VCellMessaging vcellMessaging = new VCellMessagingNoop();
-//        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
-//        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
-//
-//        Global g = new Global(modelFile);
-//        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 50, false, vcellMessaging);
-//        cp.setSimulationFolder(simulationFolder);
-//        cp.setNumRuns(NumRuns);
-//        cp.setSimulationName(sim_base_name);
-//
-//        cp.calculateLangevinAdvancedStatistics();   // cluster analysis
-//
-//        System.out.println("done");
-//    }
-//
+    public void testRunClusterAnalysis() throws IOException {
+
+        VCellMessaging vcellMessaging = new VCellMessagingNoop();
+        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
+        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
+
+        Global g = new Global(modelFile);
+        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 50, false, vcellMessaging);
+        cp.setSimulationFolder(simulationFolder);
+        cp.setNumRuns(NumRuns);
+        cp.setSimulationName(sim_base_name);
+
+        cp.calculateLangevinAdvancedStatistics();   // cluster analysis
+
+        System.out.println("done");
+    }
+
 //    @Test
-//    public void testReadJsonFiles() throws IOException {
-//
-//        VCellMessaging vcellMessaging = new VCellMessagingNoop();
-//        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
-//        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
-//
-//        Global g = new Global(modelFile);
-//        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
-//        cp.setSimulationFolder(simulationFolder);
-//        cp.setNumRuns(NumRuns);
-//        cp.setSimulationName(sim_base_name);
-//        Map<String, Integer> molecules = ConsolidationPostprocessor.getMolecules(g);
-//
-//        ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
-//        cai.readInputFiles(cp);
-//
-//        Map<String, File> nameToJsonFileMap = cai.getNameToJsonFileMap();
-//        Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap = cai.getAllRunsClusterInfoMap();
-//        assertTrue(NumRuns == nameToJsonFileMap.size(), "number of .json files should be equal to " + NumRuns);
-//        assertTrue(NumRuns == allRunsClusterInfoMap.size(), "number of .json files should be equal to " + NumRuns);
-//
-//        System.out.println("done");
-//    }
-//
-    @Test
+    public void testReadJsonFiles() throws IOException {
+
+        VCellMessaging vcellMessaging = new VCellMessagingNoop();
+        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
+        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
+
+        Global g = new Global(modelFile);
+        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
+        cp.setSimulationFolder(simulationFolder);
+        cp.setNumRuns(NumRuns);
+        cp.setSimulationName(sim_base_name);
+        Map<String, Integer> molecules = ConsolidationPostprocessor.getMolecules(g);
+
+        ConsolidationClusterAnalizerInput cai = new ConsolidationClusterAnalizerInput();
+        cai.readInputFiles(cp);
+
+        Map<String, File> nameToJsonFileMap = cai.getNameToJsonFileMap();
+        Map<Integer, Map<Double, LangevinPostprocessor.TimePointClustersInfo>> allRunsClusterInfoMap = cai.getAllRunsClusterInfoMap();
+        assertTrue(NumRuns == nameToJsonFileMap.size(), "number of .json files should be equal to " + NumRuns);
+        assertTrue(NumRuns == allRunsClusterInfoMap.size(), "number of .json files should be equal to " + NumRuns);
+
+        System.out.println("done");
+    }
+
+//    @Test
     public void testMakeJsonFiles() throws IOException {
 
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
