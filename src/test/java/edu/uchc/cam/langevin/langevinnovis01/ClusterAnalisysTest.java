@@ -35,11 +35,14 @@ public class ClusterAnalisysTest {
         directoryToBeDeleted.delete();
     }
 
-    public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis";
-    public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis/sim_Folder/data";
-    public static final String sim_base_name = "sim";
+    public static final String sim_base_name = "SimID_35189106_0_";     // use "sim" for small test
+    //public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis;    // use this for small test
+    public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2";
+//    public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2/sim_Folder/data";
+    public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2/" +
+        sim_base_name + "_FOLDER" + "/data";
 
-    public static final int NumRuns = 6;
+    public static final int NumRuns = 50;           // for small test use 6
     public static final String ClustersFileExtension = ".json";
 
 // --------------------------------------------------------------------------
@@ -56,7 +59,7 @@ public class ClusterAnalisysTest {
 //        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
 //
 //        Global g = new Global(modelFile);
-//        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
+//        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 50, false, vcellMessaging);
 //        cp.setSimulationFolder(simulationFolder);
 //        cp.setNumRuns(NumRuns);
 //        cp.setSimulationName(sim_base_name);

@@ -11,21 +11,28 @@ import java.util.Map;
 public class NdJsonUtils {
 
     public static void saveClusterInfoMapToNDJSON(Map<Double, LangevinPostprocessor.TimePointClustersInfo> clusterInfoMap,
-                                                  Path clustersFile) throws IOException {
+            Path clustersFile) throws IOException {
 
         ObjectMapper objectMapper = new ObjectMapper();
-        try (FileWriter writer = new FileWriter(clustersFile.toFile().getAbsoluteFile(), false)) {
-            for (Map.Entry<Double, LangevinPostprocessor.TimePointClustersInfo> entry : clusterInfoMap.entrySet()) {
-                // Create an object to serialize
-                Map<String, Object> ndjsonObject = new LinkedHashMap<>();
-                ndjsonObject.put("timePoint", entry.getKey());
-                ndjsonObject.put("timePointClustersInfo", entry.getValue());
+        try (FileWriter writer = new FileWriter(clustersFile.toFile(), false)) {
+            clusterInfoMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())  // enforce ascending timepoint order
+                    .forEach(entry -> {
+                        Double timePoint = entry.getKey();
+                        LangevinPostprocessor.TimePointClustersInfo info = entry.getValue();
 
-                // Write each JSON object on a new line
-                writer.write(objectMapper.writeValueAsString(ndjsonObject) + "\n");
-            }
+                        Map<String, Object> ndjsonObject = new LinkedHashMap<>();
+                        ndjsonObject.put("timePoint", timePoint);
+                        ndjsonObject.put("timePointClustersInfo", info);
+                        try {
+                            writer.write(objectMapper.writeValueAsString(ndjsonObject));
+                            writer.write("\n");
+                        } catch (IOException e) {
+                            throw new RuntimeException("Error writing JSON line for timePoint " + timePoint, e);
+                        }
+                    });
         }
-        System.out.println("Data successfully saved to NDJSON file: " + clustersFile.toFile().getAbsoluteFile().getName());
+        System.out.println("Data successfully saved to NDJSON file: " + clustersFile.toAbsolutePath().getFileName());
     }
 
     public static Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadClusterInfoMapFromNDJSON(Path clustersFile) throws IOException {
