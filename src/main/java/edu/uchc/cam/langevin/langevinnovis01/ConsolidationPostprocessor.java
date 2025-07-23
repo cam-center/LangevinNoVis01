@@ -208,3 +208,49 @@ public class ConsolidationPostprocessor {
     }
 
 }
+
+// TODO: Attention: we may get multimodal distributions, like bimodal cluster size outputs across runs, where summary
+//  statistics like mean or even standard deviation fail to convey the structure.
+//  The average becomes misleading, and worse, it can mask important behaviors in the system.
+//
+//    What we are looking for: Distribution-Aware Postprocessing
+//
+//    We should enhance the aggregation code to detect and report when simulation results diverge into multiple
+//    regimes. Here’s a rough sketch of how that could work:
+//
+//   Step 1: Collect All Scalar Cluster Size Frequencies
+//        Instead of just computing averages:
+//        - Collect all cluster sizes for all timepoints across all simulation runs
+//        - Flatten them into a single list or histogram
+//        Then we can apply a bit of statistics or signal detection.
+//
+//   Step 2: Detect Peaks via Density Estimation
+//     Options:
+//      a. Histogram peak detection:
+//        - Bin cluster sizes and look for multiple local maxima
+//        - Flag when there’s significant separation between peaks
+//      b. Kernel density estimation (KDE):
+//        - Smooth the size distribution and detect multiple modes
+//        - Java libraries like Apache Commons Math or Smile can help
+//      c. Gaussian Mixture Modeling (GMM):
+//        - Fit multiple Gaussian components to the distribution
+//        - Detect number of modes (e.g., 1 vs 2 vs 3)
+//
+//   Step 3: Surface Interpretive Statistics
+//     If multiple peaks are detected:
+//       Report them explicitly:
+//        - “Detected bimodal distribution in cluster sizes: peak1 ≈ 2.1, peak2 ≈ 18.7”
+//       Include per-mode statistics:
+//        - Count, average, stddev per peak
+//        - Fraction of total simulations contributing to each peak
+//       If possible, annotate simulations that belong to each regime, that will be helpful for diagnostics
+//
+//    Step 4: Warn on Summary Misinterpretation
+//      When multiple peaks are present:
+//        - Flag summary average as nonrepresentative
+//        - Instead, print a note: “Mean cluster size may obscure structural modes. Multiple distributions detected.”
+//
+//
+// TODO:  We should prototype a simple histogram-based detector first.
+//        Write the logic in Java using just arrays and basic math, so that we won't need extra libraries.
+//        It'll give us a lightweight mode detector to get started—and we can later swap in KDE or GMM.

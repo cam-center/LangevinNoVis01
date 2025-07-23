@@ -128,48 +128,51 @@ public class LangevinPostprocessor {
         Map<String, Integer> molecules = getMolecules(langevinOutputDir);
 
         File[] files = langevinOutputDir.toFile().listFiles((dir, name) -> name.startsWith(CLUSTERS_TIME_PREFIX) && name.endsWith(".csv"));
-        if (files != null) {
-            for (File file : files) {
-                System.out.println(" ---------------------- " + file.getName());
-                int startIndex = file.getName().lastIndexOf("_") + 1; // After the first underscore
-                int endIndex = file.getName().lastIndexOf("."); // Before the ".csv"
-                String numericPart = file.getName().substring(startIndex, endIndex);
-                double time = Double.parseDouble(numericPart);
-                TimePointClustersInfo timePointClustersInfo = new TimePointClustersInfo();
-                clusterInfoMap.put(time, timePointClustersInfo);
+        if (files == null || files.length == 0) {   // should never happen
+            throw new IllegalStateException("No cluster files found in: " + langevinOutputDir);
+        }
 
-                try (FileReader clustersTimeReader = new FileReader(file);
-                     BufferedReader reader = new BufferedReader(clustersTimeReader);
-                ) {
-                    String line;
-                    int totalClusters = 0;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.trim();
-                        if (line.startsWith("Total clusters")) {
-                            totalClusters = Integer.parseInt(line.split(",")[1].trim());
-                            timePointClustersInfo.timePointTotalClusters = totalClusters;
-                        } else if (line.startsWith("Cluster Index")) {
-                            ClusterInfo ci = new ClusterInfo();
-                            String[] clusterIndexParts = line.split(",");
-                            ci.clusterIndex = Integer.parseInt(clusterIndexParts[1].trim());
-                            while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
-                                String[] parts = line.split(",");
-                                if(parts[0].trim().equals("Size")) {
-                                    ci.size = Integer.parseInt(parts[1].trim());
-                                } else {
-                                    ci.clusterComponents.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
-                                }
+        Arrays.sort(files, Comparator.comparingDouble(file -> {     // sort files by numeric time extracted from filename
+            String name = file.getName();
+            String numericPart = name.substring(name.lastIndexOf("_") + 1, name.lastIndexOf("."));
+            return Double.parseDouble(numericPart);
+        }));
+
+        for (File file : files) {
+            int startIndex = file.getName().lastIndexOf("_") + 1;   // after the first underscore
+            int endIndex = file.getName().lastIndexOf(".");         // before the ".csv"
+            String numericPart = file.getName().substring(startIndex, endIndex);
+            double time = Double.parseDouble(numericPart);
+            TimePointClustersInfo timePointClustersInfo = new TimePointClustersInfo();
+            clusterInfoMap.put(time, timePointClustersInfo);
+
+            try (FileReader clustersTimeReader = new FileReader(file);
+                 BufferedReader reader = new BufferedReader(clustersTimeReader);
+            ) {
+                String line;
+                int totalClusters = 0;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("Total clusters")) {
+                        totalClusters = Integer.parseInt(line.split(",")[1].trim());
+                        timePointClustersInfo.timePointTotalClusters = totalClusters;
+                    } else if (line.startsWith("Cluster Index")) {
+                        ClusterInfo ci = new ClusterInfo();
+                        String[] clusterIndexParts = line.split(",");
+                        ci.clusterIndex = Integer.parseInt(clusterIndexParts[1].trim());
+                        while ((line = reader.readLine()) != null && !line.trim().isEmpty()) {
+                            String[] parts = line.split(",");
+                            if(parts[0].trim().equals("Size")) {
+                                ci.size = Integer.parseInt(parts[1].trim());
+                            } else {
+                                ci.clusterComponents.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
                             }
-                            timePointClustersInfo.timePointClusterInfoList.add(ci);
-                            System.out.println("Parsed Cluster  " + ci.clusterIndex);
                         }
+                        timePointClustersInfo.timePointClusterInfoList.add(ci);
                     }
                 }
             }
-            System.out.println("Done all files");
         }
-
-        String clustersFileName = clustersFile.toFile().getAbsoluteFile().getName();
         NdJsonUtils.saveClusterInfoMapToNDJSON(clusterInfoMap, clustersFile);
     }
 
