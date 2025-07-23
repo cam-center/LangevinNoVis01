@@ -35,17 +35,21 @@ public class ClusterAnalisysTest {
         directoryToBeDeleted.delete();
     }
 
+    // the resources are in  \src\test\resources\simdata
+
+
+
     // TODO: place some simulation results in the repository and properly invoke the tests on them
     //  in a temp directory like we do in CliTest
 
     public static final String sim_base_name = "SimID_35189106_0_";     // use "sim" for small test
     //public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis;    // use this for small test
-    public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2";
+    public static final String parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big3";
 //    public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2/sim_Folder/data";
-    public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big2/" +
+    public static final String data_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big3/" +
         sim_base_name + "_FOLDER" + "/data";
 
-    public static final int NumRuns = 50;           // for small test use 6
+    public static final int NumRuns = 3;           // for small test use 6
     public static final String ClustersFileExtension = ".json";
 
 /*
@@ -56,6 +60,7 @@ public class ClusterAnalisysTest {
 //    @Test
     public void testRunClusterAnalysis() throws IOException {
 
+        // this test needs the .json and .ida files
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
         File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
@@ -66,7 +71,15 @@ public class ClusterAnalisysTest {
         cp.setNumRuns(NumRuns);
         cp.setSimulationName(sim_base_name);
 
+        cp.calculateLangevinPrimaryStatistics();
+        File targetFile = new File(simulationFolder, sim_base_name + "_Avg.ida");
+        assertTrue(targetFile.exists(), "expected file " + sim_base_name + "_Avg.ida to exist");
+
         cp.calculateLangevinAdvancedStatistics();   // cluster analysis
+        File[] csvFiles = simulationFolder.listFiles((dir, name) -> name.endsWith(".csv"));
+        int count = csvFiles != null ? csvFiles.length : 0;
+        assertTrue(NumRuns == count, "number of .csv files should be equal to " + NumRuns);
+
 
         System.out.println("done");
     }
@@ -74,12 +87,13 @@ public class ClusterAnalisysTest {
 //    @Test
     public void testReadJsonFiles() throws IOException {
 
+        // this test reads the json files
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
         File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
 
         Global g = new Global(modelFile);
-        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 4, false, vcellMessaging);
+        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, NumRuns, false, vcellMessaging);
         cp.setSimulationFolder(simulationFolder);
         cp.setNumRuns(NumRuns);
         cp.setSimulationName(sim_base_name);
@@ -99,6 +113,7 @@ public class ClusterAnalisysTest {
 //    @Test
     public void testMakeJsonFiles() throws IOException {
 
+        // this test makes the json files for each run
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
         File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
         File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
@@ -118,10 +133,9 @@ public class ClusterAnalisysTest {
             File clustersFile = new File(parent_dir, newClustersFileName);
             LangevinPostprocessor.writeClustersFile(runDataFolder.toPath(), clustersFile.toPath());
             Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile.toPath());
-            System.out.println("aici");
         }
 
-            System.out.println("done");
+        System.out.println("done");
     }
 
 
