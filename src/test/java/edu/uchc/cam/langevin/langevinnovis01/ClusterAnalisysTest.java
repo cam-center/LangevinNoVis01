@@ -1,9 +1,5 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
-import edu.uchc.cam.langevin.cli.CliMain;
-import edu.uchc.cam.langevin.g.object.GMolecule;
-import edu.uchc.cam.langevin.helpernovis.FileMapper;
-import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -12,15 +8,12 @@ import org.vcell.data.NdJsonUtils;
 import org.vcell.data.Resource;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.VCellMessagingNoop;
-import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -65,8 +58,7 @@ public class ClusterAnalisysTest {
     public static String parent_dir = null;
     public static String sim_base_name = null;
     public static String inputFileName = null;
-
-    public static final int NumRuns = 3;           // for small test use 6
+    public static Integer NumRuns = null;           // adjust accordingly at runtime
 
     // some test that appears right at the end of the input file, if this exists hopefully all the rest is there too
     public static final String inputFileValidityCheck = "*** SIMULATION OPTIONS ***";
@@ -81,20 +73,30 @@ public class ClusterAnalisysTest {
 
     /*
      * Call this in every @Test before anything else
-     * Initializes some global variables (sim_base_name. inputFileName and parent_dir) properly,
+     * Initializes some global variables (sim_base_name. inputFileName, parent_dir and NumRuns) properly,
      *  which are null by default
      */
     public static void initialize() throws IOException, URISyntaxException {
         if(inputSource == InputSource.RESOURCES) {
-            // sim_base_name. inputFileName and parent_dir are initialized to null
+            // sim_base_name. inputFileName, parent_dir and NumRuns are initialized to null
             // they are properly set up here for "classpath" in generalInitialization()
-            generalInitialization();
+            classpathInitialization();
         } else if(inputSource == InputSource.LOCAL) {
-            // sim_base_name. inputFileName and parent_dir are initialized to null
+            // ATTENTION! only one @Test should be ran at a time, the correct running order is:
+            //   - testMakeJsonFiles()
+            //   - testReadJsonFiles()
+            //    - testRunClusterAnalysis()
+            // This way each test will create more files needed for the next test
+            // Manual delete of the files created during @Test is needed
+            // You should only start with the data_dir = parent_dir + "/" + sim_base_name + "_FOLDER" and its content,
+            //    inputFileName and one .ida file for each run
+            //
+            // sim_base_name. inputFileName, parent_dir and NumRuns are initialized to null
             // must properly set them up here for "local" to your actual locations / names
             parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big3";
             sim_base_name = "SimID_35189106_0_";
             inputFileName = sim_base_name + ".langevinInput";
+            NumRuns = 3;
         } else {
             throw new IllegalArgumentException("Unexpected InputSource value");
         }
@@ -106,13 +108,14 @@ public class ClusterAnalisysTest {
      // most of the content of rhe resources/simdata folder in the repository,  which means
      // - the input file
      // - the @sim_base_name + _FOLDER/data folder and all its content (Run0, Run1, ... folders and their content
-    public static void generalInitialization() throws IOException, URISyntaxException {
+    public static void classpathInitialization() throws IOException, URISyntaxException {
 
         System.out.println("Classpath: " + System.getProperty("java.class.path"));
 
         // override for "classpath"
         sim_base_name = "SimID_35189106_0_";
         inputFileName = sim_base_name + ".langevinInput";
+        NumRuns = 3;
 
         // // the resources are in  \resources\simdata, \resources is expressed in CLASSPATH
         URL resourceInputFileUrl = Resource.getResource("simdata/" + inputFileName);
@@ -137,8 +140,13 @@ public class ClusterAnalisysTest {
         Resource.copyFolderRecursively(resourceSimDataFolderURL, simDataFolderPath);
     }
 
+
     @AfterAll
     public static void tearDown() throws IOException {
+        if(InputSource.LOCAL == inputSource) {
+            System.out.println("For InputSource.LOCAL manual delete of the files created during Tests is needed");
+            return;
+        }
         if (!workDirPathMap.isEmpty()) {
             // this should not happen if we call cleanUp() after each test
             throw new RuntimeException("One or more temp directories still exist, have you called cleanup() at the end of each @Test?");
@@ -147,6 +155,10 @@ public class ClusterAnalisysTest {
     }
 
     private static void cleanUp() throws IOException {
+        if(InputSource.LOCAL == inputSource) {
+            System.out.println("For InputSource.LOCAL manual delete of the files created during Tests is needed");
+            return;
+        }
         if (workDirPath != null && Files.exists(workDirPath)) {
             deleteRecursively(workDirPath);
         }
