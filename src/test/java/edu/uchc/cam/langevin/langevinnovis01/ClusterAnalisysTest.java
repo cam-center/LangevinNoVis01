@@ -1,8 +1,6 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.data.NdJsonUtils;
 import org.vcell.data.Resource;
@@ -20,6 +18,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class ClusterAnalisysTest {
 
@@ -76,7 +75,8 @@ public class ClusterAnalisysTest {
      * Initializes some global variables (sim_base_name. inputFileName, parent_dir and NumRuns) properly,
      *  which are null by default
      */
-    public static void initialize() throws IOException, URISyntaxException {
+    @BeforeEach
+    public void initialize() throws IOException, URISyntaxException {
         if(inputSource == InputSource.RESOURCES) {
             // sim_base_name. inputFileName, parent_dir and NumRuns are initialized to null
             // they are properly set up here for "classpath" in generalInitialization()
@@ -148,13 +148,14 @@ public class ClusterAnalisysTest {
             return;
         }
         if (!workDirPathMap.isEmpty()) {
-            // this should not happen if we call cleanUp() after each test
-            throw new RuntimeException("One or more temp directories still exist, have you called cleanup() at the end of each @Test?");
+            // this should not happen since we call cleanUp() @AfterEach
+            throw new RuntimeException("One or more temp directories still exist, cleanup() may have failed");
         }
         System.out.println("Finished cleaning up all temporary folders successfully");
     }
 
-    private static void cleanUp() throws IOException {
+    @AfterEach
+    private void cleanUp() throws IOException {
         if(InputSource.LOCAL == inputSource) {
             System.out.println("For InputSource.LOCAL manual delete of the files created during Tests is needed");
             return;
@@ -166,7 +167,7 @@ public class ClusterAnalisysTest {
             System.err.println("Failed to delete temp directory: " + workDirPath + ", retrying");
             System.gc(); // hint JVM to release file handles
             try {
-                Thread.sleep(1000);
+                Thread.sleep(200);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt(); // restore interrupt status
                 System.err.println("Interrupted during delete retry: " + workDirPath);
@@ -194,21 +195,16 @@ public class ClusterAnalisysTest {
 
 // --------------------------------------------------------------------------------------------------------
 
-
-
 /*
  * These tests are needed for debugging rather than for automatic run in a github action,
  * but we can do both for conformity
  * just select the inputSource with the appropriate enum in setUp()
- * don't forget to invoke initialize() and cleanup() for each @Test
  * see CliTest.testRunAndPostCommand for two full solver runs and postprocessing / cluster analysis,
- * basically doing everything done here and more (only slpwer because of the 2 consecutive full solver runs)
+ * basically doing everything done here and more (only slower because of the 2 consecutive full solver runs)
  */
 
     @Test
     public void testRunClusterAnalysis() throws IOException, URISyntaxException {
-
-        initialize();
 
         if(inputSource == InputSource.RESOURCES) {  // more resource files needed specifically for this test
             URL resourceWorkingDirUrl = Resource.getResource("simdata");
@@ -237,14 +233,11 @@ public class ClusterAnalisysTest {
         // we get 3 advanced statistics files - unrelated to NumRuns!
         assertTrue(3 == csvFiles.length, "number of .csv files should be equal to 3");
 
-        cleanUp();
         System.out.println("done");
     }
 
     @Test
     public void testReadJsonFiles() throws IOException, URISyntaxException {
-
-        initialize();
 
         if(inputSource == InputSource.RESOURCES) {  // more resource files needed specifically for this test
             URL resourceWorkingDirUrl = Resource.getResource("simdata");
@@ -271,14 +264,11 @@ public class ClusterAnalisysTest {
         assertTrue(NumRuns == nameToJsonFileMap.size(), "number of .json files should be equal to " + NumRuns);
         assertTrue(NumRuns == allRunsClusterInfoMap.size(), "number of .json files should be equal to " + NumRuns);
 
-        cleanUp();
         System.out.println("done");
     }
 
     @Test
     public void testMakeJsonFiles() throws IOException, URISyntaxException {
-
-        initialize();
 
         // this test makes the json files for each run
         VCellMessaging vcellMessaging = new VCellMessagingNoop();
@@ -302,7 +292,9 @@ public class ClusterAnalisysTest {
             LangevinPostprocessor.writeClustersFile(runDataFolder.toPath(), clustersFile.toPath());
             Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile.toPath());
         }
-        cleanUp();
+        File[] jsonFiles = simulationFolder.listFiles((dir, name) -> name.toLowerCase().endsWith(".json"));
+        assertNotNull(jsonFiles, "Directory listing failed or simulationFolder is not a directory");
+        assertEquals(jsonFiles.length, (int) NumRuns, "Expected " + NumRuns + " JSON files, but found " + jsonFiles.length);
         System.out.println("done");
     }
 
