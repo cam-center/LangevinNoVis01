@@ -73,3 +73,38 @@ jobs:
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
         if: ${{ failure() }}
+  macOS-Universal:
+    name: Create Universal macOS Binary
+    runs-on: macos-latest
+    needs:
+      - CD  # This refers to the matrix job name
+    if: github.event_name == 'release'
+    steps:
+      - name: Download macOS-13 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: langevin-macos-13
+          path: binaries
+
+      - name: Download macOS-14 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: langevin-macos-14
+          path: binaries
+
+      - name: Combine with lipo
+        run: |
+          lipo -create -output binaries/langevin-universal \
+            binaries/langevin-macos-13 \
+            binaries/langevin-macos-14
+          lipo -archs binaries/langevin-universal
+
+      - name: Upload universal binary to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: binaries/langevin-universal
+          asset_name: langevin-macos-universal
+          asset_content_type: application/octet-stream
