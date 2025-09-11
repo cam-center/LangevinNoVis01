@@ -48,6 +48,13 @@ jobs:
       - name: run native executable with --help option to verify build (zero return code)
         run: ./target/langevin --help
 
+      - name: Upload macOS binary for universal merge
+        if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: langevin-${{ matrix.os }}
+          path: ./target/langevin
+
       - name: Upload MacOS or Linux solver binary to release assets
         if: github.event_name == 'release' && (matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'ubuntu-latest')
         uses: actions/upload-release-asset@v1
