@@ -99,6 +99,19 @@ jobs:
           name: langevin-macos-14
           path: binaries
 
+      - name: Inspect binaries directory
+        run: |
+          echo "Contents of binaries/:"
+          ls -lh binaries/
+          echo "File types:"
+          file binaries/*
+
+      # - name: List downloaded files
+      #   run: ls -lh binaries/
+
+      # - name: Setup tmate session for inspection
+      #   uses: mxschmitt/action-tmate@v3
+
       - name: Combine with lipo
         run: |
           lipo -create -output binaries/langevin-universal \
