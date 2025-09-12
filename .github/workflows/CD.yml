@@ -2,6 +2,7 @@ name: CD
 on:
   release:
     types: [published, edited]
+  workflow_dispatch:    # manual trigger for testing
 
 jobs:
   CD:
@@ -85,7 +86,7 @@ jobs:
     runs-on: macos-latest
     needs:
       - CD  # This refers to the matrix job name
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Download macOS-13 binary
         uses: actions/download-artifact@v4
@@ -102,8 +103,14 @@ jobs:
           name: langevin-macos-14
           path: binaries
 
+      - name: List downloaded files
+        run: ls -lh binaries/
+
       - name: Rename macOS-14 binary
         run: mv binaries/langevin binaries/langevin-macos-14
+
+      - name: Check renaming
+        run: ls -lh binaries/
 
       - name: Inspect binaries directory
         run: |
@@ -112,7 +119,7 @@ jobs:
           echo "File types:"
           file binaries/*
 
-      # - name: List downloaded files
+      # - name: Expecting 2 macos binaries
       #   run: ls -lh binaries/
 
       # - name: Setup tmate session for inspection
