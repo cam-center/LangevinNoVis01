@@ -133,6 +133,7 @@ jobs:
           lipo -archs binaries/langevin-universal
 
       - name: Upload universal binary to release
+        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
