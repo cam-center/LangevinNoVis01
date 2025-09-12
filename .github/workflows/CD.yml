@@ -87,6 +87,8 @@ jobs:
     needs:
       - CD  # This refers to the matrix job name
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    # Both binaries are named "langevin", so as soon as we download one of them we
+    # need to rename it to avoid overwriting the other one.
     steps:
       - name: Download macOS-13 binary
         uses: actions/download-artifact@v4
@@ -103,24 +105,16 @@ jobs:
           name: langevin-macos-14
           path: binaries
 
-      - name: List downloaded files
-        run: ls -lh binaries/
-
       - name: Rename macOS-14 binary
         run: mv binaries/langevin binaries/langevin-macos-14
 
-      - name: Check renaming
-        run: ls -lh binaries/
-
+      # this will go in the log of the run, useful for debugging
       - name: Inspect binaries directory
         run: |
           echo "Contents of binaries/:"
           ls -lh binaries/
           echo "File types:"
           file binaries/*
-
-      # - name: Expecting 2 macos binaries
-      #   run: ls -lh binaries/
 
       # - name: Setup tmate session for inspection
       #   uses: mxschmitt/action-tmate@v3
