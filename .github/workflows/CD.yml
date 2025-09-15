@@ -86,7 +86,7 @@ jobs:
     runs-on: macos-latest
     needs:
       - CD  # This refers to the matrix job name
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+
     # Both binaries are named "langevin", so as soon as we download one of them we
     # need to rename it to avoid overwriting the other one.
     steps:
