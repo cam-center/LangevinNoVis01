@@ -23,6 +23,17 @@ import edu.uchc.cam.langevin.langevinnovis01.MyVector;
 import edu.uchc.cam.langevin.object.Site;
 
 public class GMolecule {
+    /* Example:
+                MOLECULE: "MT0" Intracellular Number 20 Site_Types 2 Total_Sites 3 Total_Links 2 is2D false
+
+                TYPE: Name "Site0" ...
+                TYPE: Name "Site1" ...
+
+                SITE 0 : ...
+                SITE 1 : ...
+                SITE 2 : ...
+
+     */
     
     // Strings to indicate random or defined initial positions
     public final static String RANDOM = "Random";

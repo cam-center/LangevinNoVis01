@@ -43,7 +43,7 @@ public class StateCounter {
     private final int totalCount;
     
     // Let's remember all of the GMolecule names and ids
-    private final ArrayList<String> gstateFullNames = new ArrayList<>();
+    private final ArrayList<String> gstateFullNames = new ArrayList<>();    // ex: MT0:Site1:state0
     private final ArrayList<Integer> gstateIDs = new ArrayList<>();
     
     // An integer telling us how many digits to print out for the names of the 
