@@ -1,6 +1,8 @@
 package org.vcell.messaging;
 
+import okhttp3.Credentials;
 import okhttp3.HttpUrl;
+import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -14,29 +16,65 @@ import java.net.InetAddress;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class VCellMessagingRestTest {
     private MockWebServer mockWebServer;
-    private VCellMessagingRest vCellMessagingRest;
+    private VCellMessagingRest vCellMessagingRest_good_creds;
+    private VCellMessagingRest vCellMessagingRest_bad_creds;
+    private final static String BROKER_USER = "user123";
+    private final static String BROKER_PASSWORD = "password456";
+    private final String expectedCredentials = Credentials.basic(BROKER_USER, BROKER_PASSWORD);
+
+    Dispatcher dispatcher = new Dispatcher() {
+        @Override
+        public MockResponse dispatch(RecordedRequest request) throws InterruptedException {
+            String authorization = request.getHeader("Authorization");
+            if (expectedCredentials.equals(authorization)) {
+                // Correct credentials, return success response
+                return new MockResponse().setResponseCode(200).setBody("Success!");
+            } else {
+                // Missing or incorrect credentials, return 401 and a challenge
+                return new MockResponse()
+                        .setResponseCode(401)
+                        .addHeader("WWW-Authenticate", "Basic realm=\"test_realm\"");
+            }
+        }
+    };
 
     @BeforeEach
     public void setUp() throws IOException {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
+        mockWebServer.requireClientAuth();
+        mockWebServer.setDispatcher(dispatcher);
+
         HttpUrl url = mockWebServer.url("/");
 
-        MessagingConfig config = new MessagingConfig(
+        MessagingConfig config_good_creds = new MessagingConfig(
                 url.host(),
                 url.port(),
-                "msg_user",
-                "msg_pswd",
+                BROKER_USER,
+                BROKER_PASSWORD,
                 InetAddress.getLocalHost().getHostName(),
                 "vcell_user",
                 "12334483837",
                 0,
                 0
         );
-        vCellMessagingRest = new VCellMessagingRest(config);
+        MessagingConfig config_bad_creds = new MessagingConfig(
+                url.host(),
+                url.port(),
+                BROKER_USER+"_wrong",
+                BROKER_PASSWORD,
+                InetAddress.getLocalHost().getHostName(),
+                "vcell_user",
+                "12334483837",
+                0,
+                0
+        );
+        vCellMessagingRest_good_creds = new VCellMessagingRest(config_good_creds);
+        vCellMessagingRest_bad_creds = new VCellMessagingRest(config_bad_creds);
     }
 
     @AfterEach
@@ -45,10 +83,7 @@ public class VCellMessagingRestTest {
     }
 
     @Test
-    public void testSendWorkerEvent_starting() throws Exception {
-        // Arrange
-        mockWebServer.enqueue(new MockResponse().setBody("OK"));
-
+    public void testSendWorkerEvent_starting_good_creds() throws Exception {
         String expectedPath_start =
                 "/api/message/workerEvent" +
                         "?type=queue" +
@@ -66,7 +101,7 @@ public class VCellMessagingRestTest {
                         "&WorkerEvent_Progress=0.0" +
                         "&WorkerEvent_TimePoint=0.0";
 
-        vCellMessagingRest.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"));
+        vCellMessagingRest_good_creds.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"), VCellMessaging.ThrowOnException.YES);
 
         RecordedRequest request = mockWebServer.takeRequest();
         assertEquals("POST", request.getMethod());
@@ -75,10 +110,32 @@ public class VCellMessagingRestTest {
     }
 
     @Test
-    public void testSendWorkerEvent_progress() throws Exception {
-        // Arrange
-        mockWebServer.enqueue(new MockResponse().setBody("OK"));
+    public void testSendWorkerEvent_starting_bad_creds() throws Exception {
+        String expectedPath_start =
+                "/api/message/workerEvent" +
+                        "?type=queue" +
+                        "&JMSPriority=5" +
+                        "&JMSTimeToLive=600000" +
+                        "&JMSDeliveryMode=persistent" +
+                        "&MessageType=WorkerEvent" +
+                        "&UserName=vcell_user" +
+                        "&HostName=" + InetAddress.getLocalHost().getHostName() +
+                        "&SimKey=12334483837" +
+                        "&TaskID=0" +
+                        "&JobIndex=0" +
+                        "&WorkerEvent_Status=999" +
+                        "&WorkerEvent_StatusMsg=Starting+Job" +
+                        "&WorkerEvent_Progress=0.0" +
+                        "&WorkerEvent_TimePoint=0.0";
 
+        assertThrows(
+                RuntimeException.class,
+                () -> vCellMessagingRest_bad_creds.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"), VCellMessaging.ThrowOnException.YES),
+                "expected authentication failure to throw RuntimeException");
+    }
+
+    @Test
+    public void testSendWorkerEvent_progress() throws Exception {
         String expectedPath_progress =
                 "/api/message/workerEvent" +
                         "?type=queue" +
@@ -96,7 +153,7 @@ public class VCellMessagingRestTest {
                         "&WorkerEvent_Progress=0.4" +
                         "&WorkerEvent_TimePoint=2.0";
 
-        vCellMessagingRest.sendWorkerEvent(WorkerEvent.progressEvent(0.4, 2.0));
+        vCellMessagingRest_good_creds.sendWorkerEvent(WorkerEvent.progressEvent(0.4, 2.0), VCellMessaging.ThrowOnException.YES);
 
         RecordedRequest request = mockWebServer.takeRequest();
         assertEquals("POST", request.getMethod());

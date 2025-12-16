@@ -7,6 +7,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Optional;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class VCellMessagingRest implements VCellMessaging {
 
@@ -65,7 +69,7 @@ public class VCellMessagingRest implements VCellMessaging {
     }
 
     @Override
-    public void sendWorkerEvent(WorkerEvent event) {
+    public void sendWorkerEvent(WorkerEvent event, ThrowOnException throwOnException) {
         // make a REST call to the ActiveMQ server on it's rest port to send the event
         // Documentation for the ActiveMQ restful API is missing, must see source code
         //
@@ -140,7 +144,7 @@ public class VCellMessagingRest implements VCellMessaging {
             }
             // these characters are not valid both in database and in messages as a property
             revisedMsg = revisedMsg.replaceAll("[\n\r'\"]", " ");
-            revisedMsg = URLEncoder.encode(revisedMsg, StandardCharsets.UTF_8);
+            revisedMsg = URLEncoder.encode(revisedMsg, UTF_8);
             ss_url.append(WORKEREVENT_STATUSMSG).append("=").append(revisedMsg).append("&");
         }
 
@@ -150,16 +154,31 @@ public class VCellMessagingRest implements VCellMessaging {
         System.out.println("URL: " + ss_url.toString());
         URI uri = URI.create(ss_url.toString());
         HttpClient client = HttpClient.newHttpClient();
+        String credentials = Base64.getEncoder().encodeToString((m_broker_username+":"+m_broker_password).getBytes(UTF_8));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(uri)
+                .header("Authorization", "Basic " + credentials)
                 .POST(HttpRequest.BodyPublishers.ofString(""))
                 .build();
         try {
             // send the request
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             System.out.println(response.statusCode());
+            if (response.statusCode() != 200) {
+                String errorMsg = "Failed to send WorkerEvent via REST to ActiveMQ server, HTTP response code: " + response.statusCode() + ", body: " + response.body();
+                if (throwOnException == ThrowOnException.YES) {
+                    throw new RuntimeException(errorMsg);
+                } else {
+                    System.err.println(errorMsg);
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
+            if (throwOnException == ThrowOnException.NO) {
+                System.err.println("Exception sending WorkerEvent via REST to ActiveMQ server: " + e.getMessage());
+                return;
+            }
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 }

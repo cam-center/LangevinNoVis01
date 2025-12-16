@@ -190,7 +190,7 @@ public class MySystem {
         this.useOutputFile = useOutputFile;
         this.vcellMessaging = vcellMessaging;
 
-        vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"), VCellMessaging.ThrowOnException.NO);
 
         this.decayReactions = g.getDecayReactions();
         bindingReactions = new BindingReactions(g);
@@ -1114,7 +1114,7 @@ public class MySystem {
 
                 nextRealTime += (totalTime/100.0);
             }
-            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(time/(totalTime + dt), time)); // progress message are throttled by vcellMessaging
+            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(time/(totalTime + dt), time), VCellMessaging.ThrowOnException.NO); // progress message are throttled by vcellMessaging
 
             time += dt;
             update();
@@ -1167,9 +1167,9 @@ public class MySystem {
         }
         LangevinPostprocessor.writeIdaFile(dataFolder.toPath(),idaFile.toPath());
         LangevinPostprocessor.writeClustersFile(dataFolder.toPath(),clustersFile.toPath());
-        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(1.0, time));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, time));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(time));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(1.0, time), VCellMessaging.ThrowOnException.NO);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, time), VCellMessaging.ThrowOnException.NO);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(time), VCellMessaging.ThrowOnException.NO);
         // </editor-fold>
     }
 

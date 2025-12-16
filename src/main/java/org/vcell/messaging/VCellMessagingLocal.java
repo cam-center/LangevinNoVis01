@@ -21,7 +21,7 @@ public class VCellMessagingLocal implements VCellMessaging {
         this.progress_event_interval_ms = progressEventInterval_ms;
     }
     @Override
-    public void sendWorkerEvent(WorkerEvent event) {
+    public void sendWorkerEvent(WorkerEvent event, ThrowOnException throwOnException) {
         switch (event.status()) {
             case JOB_DATA:
                 stdout.println("[[[data:"+event.timepoint()+"]]]");
