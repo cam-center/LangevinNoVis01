@@ -1,5 +1,9 @@
 package org.vcell.messaging;
 
 public interface VCellMessaging {
-    void sendWorkerEvent(WorkerEvent event);
+    enum ThrowOnException {
+        YES,
+        NO
+    }
+    void sendWorkerEvent(WorkerEvent event, ThrowOnException throwOnException);
 }

@@ -15,6 +15,19 @@ import edu.uchc.cam.langevin.object.Molecule;
 import edu.uchc.cam.langevin.object.Site;
 
 public class GSite {
+    /* Example:
+        a GMolecule may have multiple GSites of the same GSiteType:
+
+                 SITE 0 : Intracellular : Initial State 'state0'
+                      TYPE: Name "Site0" Radius 1.00000 D 1.000 Color BLUE STATES "state0"
+                      x 0.00000 y 0.00000 z 0.00000
+                 SITE 1 : Intracellular : Initial State 'state0'
+                      TYPE: Name "Site1" Radius 1.00000 D 1.000 Color RED STATES "state0" "state1"
+                      x 0.00000 y 0.00000 z 0.00000
+                 SITE 2 : Intracellular : Initial State 'state0'
+                      TYPE: Name "Site1" Radius 1.00000 D 1.000 Color RED STATES "state0" "state1"
+                      x 0.00000 y 0.00000 z 0.00000
+     */
     
     private final GMolecule gmolecule;
     private final GSiteType type;

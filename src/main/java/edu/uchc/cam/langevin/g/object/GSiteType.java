@@ -13,7 +13,12 @@ import java.util.ArrayList;
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
 
 public class GSiteType {
+/* Example:
+    the list of GSiteTypes belonging to a GMolwcule
 
+                 TYPE: Name "Site0" Radius 1.00000 D 1.000 Color BLUE STATES "state0"
+                 TYPE: Name "Site1" Radius 1.00000 D 1.000 Color RED STATES "state0" "state1"
+ */
     private String name;
     
     private final GMolecule molecule;
@@ -21,10 +26,8 @@ public class GSiteType {
     private int typeID; // Number between 1000000 and 3999999
     // Both radii in nm
     private double radius;
-    // Either 1.5x radius or r+2 nm, whichever is smaller, but not smaller than r+0.5 nm.
-    private double reactionRadius;
-    // D here is still in um^2/s! Gets converted to nm^2/s in the Site class and the BindingReaction class.
-    private double D;
+    private double reactionRadius;  // either 1.5x radius or r+2 nm, whichever is smaller, but not smaller than r+0.5 nm
+    private double D;   // still in um^2/s! Gets converted to nm^2/s in the Site class and the BindingReaction class
     private String color;
     
     private ArrayList<GState> states = new ArrayList<>();

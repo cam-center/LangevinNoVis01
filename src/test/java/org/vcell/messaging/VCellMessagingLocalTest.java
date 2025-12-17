@@ -43,17 +43,17 @@ public class VCellMessagingLocalTest {
         VCellMessagingLocal vcellMessaging = new VCellMessagingLocal(stdout, stderr, progressInterval_ms);
 
         // test sendWorkerEvent
-        vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.0, 0.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, 0.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.1, 0.5));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.1, 0.5));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.0, 0.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, 0.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.1, 0.5), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.1, 0.5), VCellMessaging.ThrowOnException.YES);
         Thread.sleep(2*progressInterval_ms);
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.5, 2.5));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.5,2.5));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.5, 2.5), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.5,2.5), VCellMessaging.ThrowOnException.YES);
         Thread.sleep(2*progressInterval_ms);
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, 5.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(5.0));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, 5.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(5.0), VCellMessaging.ThrowOnException.YES);
 
         stderr.flush();
         stdout.flush();
@@ -85,14 +85,14 @@ public class VCellMessagingLocalTest {
         VCellMessagingLocal vcellMessaging = new VCellMessagingLocal(stdout, stderr, progressInterval_ms);
 
         // test sendWorkerEvent
-        vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.0, 0.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, 0.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.4, 2.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.4, 2.0));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.0, 0.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, 0.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(0.4, 2.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.4, 2.0), VCellMessaging.ThrowOnException.YES);
         Thread.sleep(2*progressInterval_ms);
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.6, 3.0));
-        vcellMessaging.sendWorkerEvent(WorkerEvent.failureEvent("Failure"));
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.6, 3.0), VCellMessaging.ThrowOnException.YES);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.failureEvent("Failure"), VCellMessaging.ThrowOnException.YES);
 
         stderr.flush();
         stdout.flush();
