@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-13, windows-latest, ubuntu-latest, macos-14]
+        os: [macos-15-intel, windows-latest, ubuntu-latest, macos-14]
     steps:
       - uses: actions/checkout@v4
 
@@ -32,11 +32,11 @@ jobs:
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
-        if: matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'windows-latest'
 
       - name: java build and test
         run: mvn test
-        if: matrix.os == 'macos-13'|| matrix.os == 'macos-14'  || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel'|| matrix.os == 'macos-14'  || matrix.os == 'windows-latest'
 
       - name: static native build without test - linux only
         run: mvn -Pnative-static -DskipTests=true package
@@ -44,20 +44,20 @@ jobs:
 
       - name: non-static native build without test - macos or windows
         run: mvn -Pnative -DskipTests=true package
-        if: matrix.os == 'macos-13'|| matrix.os == 'macos-14'  || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel'|| matrix.os == 'macos-14'  || matrix.os == 'windows-latest'
 
       - name: run native executable with --help option to verify build (zero return code)
         run: ./target/langevin --help
 
       - name: Upload macOS binary for universal merge
-        if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14'
         uses: actions/upload-artifact@v4
         with:
           name: langevin-${{ matrix.os }}
           path: ./target/langevin
 
       - name: Upload MacOS or Linux solver binary to release assets
-        if: github.event_name == 'release' && (matrix.os == 'macos-13' || matrix.os == 'macos-14' || matrix.os == 'ubuntu-latest')
+        if: github.event_name == 'release' && (matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'ubuntu-latest')
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -93,11 +93,11 @@ jobs:
       - name: Download macOS-13 binary
         uses: actions/download-artifact@v4
         with:
-          name: langevin-macos-13
+          name: langevin-macos-15-intel
           path: binaries
 
       - name: Rename macOS-13 binary
-        run: mv binaries/langevin binaries/langevin-macos-13
+        run: mv binaries/langevin binaries/langevin-macos-15-intel
 
       - name: Download macOS-14 binary
         uses: actions/download-artifact@v4
@@ -122,7 +122,7 @@ jobs:
       - name: Combine with lipo
         run: |
           lipo -create -output binaries/langevin-universal \
-            binaries/langevin-macos-13 \
+            binaries/langevin-macos-15-intel \
             binaries/langevin-macos-14
           lipo -archs binaries/langevin-universal
 
