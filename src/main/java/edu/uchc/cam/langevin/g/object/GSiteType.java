@@ -51,10 +51,20 @@ public class GSiteType {
     public void setID(int id){
         typeID = id;
     }
-    
-    public void setRadius(double r){
+
+    /*
+     * geometric and numerical safety constraints that ensure molecules don’t react at a distance
+     * or overlap unrealistically
+     * enforce a lower bound (from geometry / molecules taking space)
+     * enforce an upper bound (from physical plausibility)
+     */
+    public void setRadius(double r) {
         this.radius = r;
+        // 0.5+r (nm) minimum separation between molecules to avoid overlaps, add 0.5nm as a buffer
+        // 1.5*r (nm) prevents very large molecules from having unrealistically tiny reaction radii
         double minRadius = Math.max(0.5 + r, 1.5*r);
+
+        // r+2 (nm) upper bound for the reaction radius, prevents reactions from occurring at unphysically large distances
         this.reactionRadius = Math.min(minRadius, r+2);
     }
     
