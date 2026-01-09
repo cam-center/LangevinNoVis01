@@ -2,13 +2,19 @@ package edu.uchc.cam.langevin.langevinnovis01;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.VCellMessagingLocal;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class MySystemTest {
 
@@ -140,4 +146,70 @@ public class MySystemTest {
             deleteDirectory(tempDirectory.toFile());
         }
     }
+
+    /*
+    this is the springsalad tutorial, as described on vcell.org/ssalad-2
+    on: https://vcell.org/webstart/SpringSaLaD/SpringSaLaDUsersGuideAndTutorial.pdf
+     */
+    @Test
+    public void loadFileFromResource() throws Exception {
+        URL url = getClass().getResource("/tutorial.ssld");
+        assertNotNull(url);
+
+        File modelFile = new File(url.toURI());
+        File logFile = File.createTempFile("tutorialTest", ".log");
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+
+        try {
+            Global g = new Global(modelFile, logFile);
+            assertNotNull(g);
+
+            MySystem sys = new MySystem(g, 0, true, vcellMessaging);
+            assertNotNull(sys);
+        } finally {
+            logFile.delete();
+        }
+    }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    @Test
+    public void simulateFileFromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 0;
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/tutorial.ssld")) {
+            assertNotNull(is, "Resource tutorial.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + ".log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + ".ida");
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            sys.runSystem();
+            Assertions.assertTrue(Files.exists(idaFile));
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
 }

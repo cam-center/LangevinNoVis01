@@ -98,9 +98,15 @@ public class GBindingReaction {
         return lambdaNew;
     }
 
-    private void setLambda(){
-        // First rescale kon so that it is in nm^3/s
+    private void setLambda() {
+        System.out.println("BindingReaction: " + name + ", setLambda() called.");
+        // conversion when going from concentration‑based kinetics to particle‑based / spatial stochastic kinetics
+        // rescale kon from 1/(uM*s) to nm^3/s
+        // 1uM = 10^-6 molecules/l, multiply by NA = 6.022e23 molecules/mol to get 6.022e17 molecules/liter
+        // 1 liter = 10e24 nm^3 so 1uM = 6.022e17 / 1e24 = 6.022e-7 molecules/nm^3
+        // 1/
         double rescalekon = kon*1660000.0;
+
         double p = type[0].getRadius() + type[1].getRadius();
         double R = type[0].getReactionRadius() + type[1].getReactionRadius();
         // Rescale site type diffusion rate D so it's in nm^2/s (from um^2/s)
@@ -129,11 +135,21 @@ public class GBindingReaction {
         double volReact = 4.0 * Math.PI * (Math.pow(R,3) - Math.pow(p,3)) / 3.0;    // R=reaction radius, p=site radius
         double kD = 4 * Math.PI * R * D;        // R=reaction radius, D=diffusion rate
         double kOnIntrinsic = (rescalekon * kD) / (kD - rescalekon);    // may be negative, we take the abs value
-        if(kOnIntrinsic <= 0.0) {
-            throw new RuntimeException("Kon is too large");
+        if(kOnIntrinsic < 0.0) {
+            double t0r=type[0].getRadius();
+            double t1r=type[1].getRadius();
+            double t0R=type[0].getReactionRadius();
+            double t1R=type[1].getReactionRadius();
+            double t0D=type[0].getD();
+            double t1D=type[1].getD();
+
+            throw new RuntimeException("Kon is too large, leading to non-physical negative intrinsic on-rate!\n"
+                    + "Molecule 1: " + molecule[0].getName() + ", Type: " + type[0].getName() + ", Radius: " + t0r + " nm, Reaction Radius: " + t0R + " nm, D: " + t0D + " um^2/s\n"
+                    + "Molecule 2: " + molecule[1].getName() + ", Type: " + type[1].getName() + ", Radius: " + t1r + " nm, Reaction Radius: " + t1R + " nm, D: " + t1D + " um^2/s\n"
+                    + "Kon: " + kon + " uM^-1 s^-1");
         }
         lambdaNew = kOnIntrinsic / volReact;
-        System.out.println("Called setLambda.  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
+        System.out.println("  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
 
         kOffIntrinsic = koff * kOnIntrinsic / rescalekon;
     }
