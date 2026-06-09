@@ -73,7 +73,6 @@ public class TransitionReactions {
                     break;
                 }
                 switch(reaction.getConditionID()){
-                    
                     // If there is no condition, then just try the reaction
                     case GTransitionReaction.NONE:{
                         if(reactionOccurs(reaction.getRate())){
@@ -85,7 +84,6 @@ public class TransitionReactions {
                         }
                         break;
                     }
-                
                     // Now try the reactions with unbound (free) conditions
                     case GTransitionReaction.FREE:{
                         if(!site.isBound()){
@@ -96,7 +94,6 @@ public class TransitionReactions {
                         }
                         break;
                     }
-                    
                     // Now try the reactions which only occur when a site is bound
                     case GTransitionReaction.BOUND:{
                         if(site.isBound()){
