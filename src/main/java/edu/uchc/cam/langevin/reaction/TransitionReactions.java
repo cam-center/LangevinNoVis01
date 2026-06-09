@@ -121,21 +121,29 @@ public class TransitionReactions {
                         }
                         break;
                     }
-                    
                     default:
                         // Do nothing
                 }
             }
         }
     }
-    
+
+    // we changed the state of a site that is part of the bond
+    // there may be another binding reaction for which this complex is now a participant
+    // if there isn't any, we keep the same bond type (which is a lie, but it is better than using a null reaction name
+    // which would crash the counter logic)
     private void updateBondType(Site site){
         String id = Integer.toString(site.getState().getID());
         String partnerID = Integer.toString(site.getBindingPartner().getState().getID());
         Bond bond = site.getBond();
-        bond.setReactionName(bindingReactions.getName(id, partnerID));
+        if(bindingReactions.getName(id, partnerID) != null) {
+            bond.setReactionName(bindingReactions.getName(id, partnerID));
+        }
         bond.setOffProbability(bindingReactions.getOffProb(id, partnerID));
-        bond.setBondLength(bindingReactions.getBondLength(id, partnerID));
+        Double bondLength = bindingReactions.getBondLength(id, partnerID);
+        if (bondLength != null) {
+            bond.setBondLength(bondLength);
+        }
     }
     
     private boolean reactionOccurs(double rate){
