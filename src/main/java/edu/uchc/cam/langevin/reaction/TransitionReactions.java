@@ -73,7 +73,6 @@ public class TransitionReactions {
                     break;
                 }
                 switch(reaction.getConditionID()){
-                    
                     // If there is no condition, then just try the reaction
                     case GTransitionReaction.NONE:{
                         if(reactionOccurs(reaction.getRate())){
@@ -85,7 +84,6 @@ public class TransitionReactions {
                         }
                         break;
                     }
-                
                     // Now try the reactions with unbound (free) conditions
                     case GTransitionReaction.FREE:{
                         if(!site.isBound()){
@@ -96,7 +94,6 @@ public class TransitionReactions {
                         }
                         break;
                     }
-                    
                     // Now try the reactions which only occur when a site is bound
                     case GTransitionReaction.BOUND:{
                         if(site.isBound()){
@@ -121,21 +118,29 @@ public class TransitionReactions {
                         }
                         break;
                     }
-                    
                     default:
                         // Do nothing
                 }
             }
         }
     }
-    
+
+    // we changed the state of a site that is part of the bond
+    // there may be another binding reaction for which this complex is now a participant
+    // if there isn't any, we keep the same bond type (which is a lie, but it is better than using a null reaction name
+    // which would crash the counter logic)
     private void updateBondType(Site site){
         String id = Integer.toString(site.getState().getID());
         String partnerID = Integer.toString(site.getBindingPartner().getState().getID());
         Bond bond = site.getBond();
-        bond.setReactionName(bindingReactions.getName(id, partnerID));
+        if(bindingReactions.getName(id, partnerID) != null) {
+            bond.setReactionName(bindingReactions.getName(id, partnerID));
+        }
         bond.setOffProbability(bindingReactions.getOffProb(id, partnerID));
-        bond.setBondLength(bindingReactions.getBondLength(id, partnerID));
+        Double bondLength = bindingReactions.getBondLength(id, partnerID);
+        if (bondLength != null) {
+            bond.setBondLength(bondLength);
+        }
     }
     
     private boolean reactionOccurs(double rate){

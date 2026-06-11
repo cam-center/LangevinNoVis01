@@ -208,7 +208,7 @@ public class BindingReactions {
         return reactionNames.get(key1+key2);
     }
 
-    public double getBondLength(String key1, String key2){
+    public Double getBondLength(String key1, String key2){
         return bondLengths.get(key1+key2);
     }
 

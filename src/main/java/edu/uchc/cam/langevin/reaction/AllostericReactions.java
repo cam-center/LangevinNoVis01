@@ -108,9 +108,14 @@ public class AllostericReactions {
         String id = Integer.toString(site.getState().getID());
         String partnerID = Integer.toString(site.getBindingPartner().getState().getID());
         Bond bond = site.getBond();
-        bond.setReactionName(bindingReactions.getName(id, partnerID));
+        if(bindingReactions.getName(id, partnerID) != null) {
+            bond.setReactionName(bindingReactions.getName(id, partnerID));
+        }
         bond.setOffProbability(bindingReactions.getOffProb(id, partnerID));
-        bond.setBondLength(bindingReactions.getBondLength(id, partnerID));
+        Double bondLength = bindingReactions.getBondLength(id, partnerID);
+        if (bondLength != null) {
+            bond.setBondLength(bondLength);
+        }
     }
     
 }
