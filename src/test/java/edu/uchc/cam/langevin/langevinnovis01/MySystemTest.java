@@ -214,8 +214,14 @@ public class MySystemTest {
 
     // do not run on github actions, it's somewhat long
     @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * TransitionCondBound.ssld is a file that was used to test a specific bug related to conditional bound transition
+     * where the bond object remains hanging if no reverse rate is to be found, and the simulation would crash with a
+     * null pointer exception when the bond object is being updated. This test is meant to ensure that this bug is fixed
+     * and does not regress in the future, but also to serve as a general test for bond management after transitioning.
+     */
     @Test
-    public void routineDebuggingFromResource() throws IOException {
+    public void transitionConditionBoundFromResource() throws IOException {
         String sim_base_name = "sim";
         int runCounter = 0;
 
@@ -223,6 +229,52 @@ public class MySystemTest {
         String inputFileContents;
         try (InputStream is = getClass().getResourceAsStream("/TransitionCondBound.ssld")) {
             assertNotNull(is, "Resource TransitionCondBound.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + ".log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + ".ida");
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            sys.runSystem();
+            Assertions.assertTrue(Files.exists(idaFile));
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * BindingWithZeroKf.ssld is a file that was used to test a specific bug related to bimolecular binding
+     * reactions with zero forward rate constant - technically a pure unbinding reaction
+     * in r2, if kon is greater than zero, say 0.001 then the simulation runs fine,
+     * but if kon is set to zero, then the reaction is skipped entirely and unbinding never happens
+     */
+    @Test
+    public void bindingWithZeroKfFromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 0;
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/BindingWithZeroKf.ssld")) {
+            assertNotNull(is, "Resource BindingWithZeroKf.ssld not found");
             inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
         }
 
