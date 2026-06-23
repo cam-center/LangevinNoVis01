@@ -126,7 +126,7 @@ public class TransitionReactions {
     }
 
     // we changed the state of a site that is part of the bond
-    // there may be another binding reaction for which this complex is now a participant
+    // there may be another binding reaction (dissociation) for which this complex is now a participant
     // if there isn't any, we keep the same bond type (which is a lie, but it is better than using a null reaction name
     // which would crash the counter logic)
     private void updateBondType(Site site){
@@ -141,6 +141,11 @@ public class TransitionReactions {
         if (bondLength != null) {
             bond.setBondLength(bondLength);
         }
+//        Site s0 = bond.getSites()[0];
+//        Site s1 = bond.getSites()[1];
+//        String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
+//        double koff = bindingReactions.getOffProb(id, partnerID);
+//        System.out.println("Transition reaction occured, new bond for " + bond.getName() + "koff: " + koff + " between " + who);
     }
     
     private boolean reactionOccurs(double rate){

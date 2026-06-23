@@ -52,14 +52,16 @@ public class Bond extends Link {
         this.reactionName = reactionName;
     }
     
-    /* ****************** SET THE DISSOCIATION RATE **************/
+    /* ****************** SET AND GET THE DISSOCIATION RATE **************/
     
     public void setOffProbability(double rate, double dt){
         offProb = rate*dt;
     }
-    
     public void setOffProbability(double offProb){
         this.offProb = offProb;
+    }
+    public double getOffProbability() {
+        return offProb;
     }
     
     /* ****************** SET THE BOND LENGTH ***********************/

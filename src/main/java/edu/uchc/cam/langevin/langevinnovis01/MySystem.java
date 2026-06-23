@@ -553,17 +553,15 @@ public class MySystem {
                     if(!site.isBound() && !tempSite.isBound()){
                         GState state1 = site.getState();
                         GState state2 = tempSite.getState();
-                        // System.out.println("(state1, state2) = (" + state1.getName() + ", " + state2.getName() + ")");
                         String key1 = state1.getIdAsString();
                         String key2 = state2.getIdAsString();
+//                        System.out.println("--- (state1, state2) = (" + state1.getName() + ", " + state2.getName() + ")");
+//                        System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
 
-                        // System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
-
-                        // System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
                         // Now make sure the sites actually react (if they don't
                         // then this prevents an unnecessary random number generation).
                         if(bindingReactions.doReact(key1, key2)){
-                            // System.out.println("Looking for reaction.");
+//                            System.out.println("Looking for reaction.");
                             if(bindingReactions.checkForReaction(key1, key2)){
                                 Bond newBond = new Bond(site, tempSite,
                                         SpringConstant, bindingReactions.getOffProb(key1, key2),
@@ -590,10 +588,13 @@ public class MySystem {
                                     }
                                     m1.plusBond();
                                 }
+//                                Site s0 = newBond.getSites()[0];
+//                                Site s1 = newBond.getSites()[1];
+//                                String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
+//                                System.out.println("Binding reaction occured: " + bindingReactions.getName(key1, key2) + " between " + who);
                             }
                         }
                     }
-
                 }
             }
         }
@@ -1001,6 +1002,10 @@ public class MySystem {
             bond.updateOrientation();
             bond.updateForces();
             if(bond.dissociates()){
+//                Site s0 = bond.getSites()[0];
+//                Site s1 = bond.getSites()[1];
+//                String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
+//                System.out.println("Bond " + bond.getName() + " dissociates: " + who);
                 bondsToRemove.add(bond);
                 Site [] bsite = bond.getSites();
                 bsite[0].setBound(false);

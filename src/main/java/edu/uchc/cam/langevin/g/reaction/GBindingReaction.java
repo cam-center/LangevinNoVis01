@@ -32,6 +32,9 @@ public class GBindingReaction {
     private double koff = 0.0;  // Units s-1.  This is given directly to the bond.
     public double kOffIntrinsic = 0.0;
 
+    // The bond length is the distance between the margins of the two sites when they are bound.
+    // The effective distance between the centers of the two sites when they are bound
+    // is bondLength + type[0].getRadius() + type[1].getRadius()
     private double bondLength = 0.5; // Units nm
 
     public final static String ANY_STATE_STRING = "Any_State";
@@ -134,7 +137,7 @@ public class GBindingReaction {
         }
         double volReact = 4.0 * Math.PI * (Math.pow(R,3) - Math.pow(p,3)) / 3.0;    // R=reaction radius, p=site radius
         double kD = 4 * Math.PI * R * D;        // R=reaction radius, D=diffusion rate
-        double kOnIntrinsic = (rescalekon * kD) / (kD - rescalekon);    // may be negative, we take the abs value
+        double kOnIntrinsic = (rescalekon * kD) / (kD - rescalekon);    // may be negative if rescalekon > kD, which is non-physical
         if(kOnIntrinsic < 0.0) {
             double t0r=type[0].getRadius();
             double t1r=type[1].getRadius();
@@ -151,7 +154,13 @@ public class GBindingReaction {
         lambdaNew = kOnIntrinsic / volReact;
         System.out.println("  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
 
-        kOffIntrinsic = koff * kOnIntrinsic / rescalekon;
+        // if kon is 0 (pure dissociation), then the normal formula for kOffIntrinsic will give NaN
+        // because we divide by rescalekon == 0.  In that case, we just set kOffIntrinsic = koff.
+        if(kon == 0.0) {
+            kOffIntrinsic = koff;
+        } else {
+            kOffIntrinsic = koff * kOnIntrinsic / rescalekon;
+        }
     }
 
     public double getBondLength(){
