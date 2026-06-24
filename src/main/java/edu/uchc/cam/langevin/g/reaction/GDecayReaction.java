@@ -10,7 +10,7 @@ import java.util.Scanner;
 import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 
-public class GDecayReaction {
+public class GDecayReaction implements GReactionInterface{
     
     private double kcreate;  // units uM/s
     private double kdecay;   // units 1/s
@@ -38,7 +38,8 @@ public class GDecayReaction {
     public double getCreationRate(){
         return kcreate;
     }
-    
+
+    @Override
     public String getName(){
         return gmolecule.getName();
     }

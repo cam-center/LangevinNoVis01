@@ -9,6 +9,8 @@
 
 package edu.uchc.cam.langevin.reaction;
 
+import edu.uchc.cam.langevin.counter.ReactionCounter;
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import edu.uchc.cam.langevin.object.Bond;
 import edu.uchc.cam.langevin.object.Site;
 import edu.uchc.cam.langevin.object.Molecule;
@@ -32,8 +34,10 @@ public class AllostericReactions {
     private final double dt;
     
     private final BindingReactions bindingReactions;
+
+    private ReactionCounter reactionCounter;
     
-    public AllostericReactions(Global g, BindingReactions bindingReactions){
+    public AllostericReactions(Global g, MySystem sys, BindingReactions bindingReactions){
         ArrayList<GAllostericReaction> reactions = g.getAllostericReactions();
         ArrayList<GSite> allSites = new ArrayList<>();
         this.dt = g.getdt();
@@ -69,7 +73,11 @@ public class AllostericReactions {
             rxnList.add(reaction);
         }
     }
-    
+
+    public void setReactionCounter(MySystem sys){
+        this.reactionCounter = sys.getReactionCounter();
+    }
+
     public void tryReactions(Site site){
         Molecule molecule = site.getMolecule();
         String molID = Integer.toString(molecule.getGID());
@@ -88,6 +96,7 @@ public class AllostericReactions {
                     
                     if(currentState == allostericState){
                         if(reactionOccurs(reaction.getRate())){
+                            reactionCounter.plusAllostericReaction(reaction.getName());
                             site.setState(reaction.getFinalState());
                             if(site.isBound()){
                                 updateBondType(site);

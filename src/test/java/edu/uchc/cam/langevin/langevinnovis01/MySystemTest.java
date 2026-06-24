@@ -304,4 +304,51 @@ public class MySystemTest {
         }
     }
 
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * AllReactions.ssld is a file that was used to test a combination of all reaction types, including creation,
+     * decay, state transition, allosteric, and bimolecular binding reactions
+     * Also helped in implementation and debugging the reaction counter feature
+     */
+    @Test
+    public void allReactionsFromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 0;
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + ".log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + ".ida");
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            sys.runSystem();
+            Assertions.assertTrue(Files.exists(idaFile));
+            sys.getReactionCounter().printCounts();
+            sys.getReactionCounter().printDetailedCounts();
+            System.out.println("done");
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
 }

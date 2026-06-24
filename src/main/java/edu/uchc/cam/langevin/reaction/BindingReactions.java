@@ -9,6 +9,7 @@
 
 package edu.uchc.cam.langevin.reaction;
 
+import edu.uchc.cam.langevin.counter.ReactionCounter;
 import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.g.object.GState;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import edu.uchc.cam.langevin.helpernovis.Rand;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 
 public class BindingReactions {
 
@@ -30,6 +32,8 @@ public class BindingReactions {
     // Store the bond lengths
     private final HashMap<String, Double> bondLengths;
 
+    private ReactionCounter reactionCounter;
+
     /**
      * The constructor will be given arraylists of all the molecules and
      * all of the binding reactions.  The former will be used to make pairs
@@ -40,7 +44,7 @@ public class BindingReactions {
      * @param g The global class for this run.
      */
 
-    public BindingReactions(Global g){
+    public BindingReactions(Global g, MySystem sys) {
         ArrayList<GMolecule> gmolecules = g.getMolecules();
         ArrayList<GBindingReaction> reactions = g.getBindingReactions();
         double dt = g.getdt();
@@ -152,6 +156,10 @@ public class BindingReactions {
                 }
             }
         }
+    }
+
+    public void setReactionCounter(MySystem sys){
+        this.reactionCounter = sys.getReactionCounter();
     }
 
     //  Helper function to add a reaction

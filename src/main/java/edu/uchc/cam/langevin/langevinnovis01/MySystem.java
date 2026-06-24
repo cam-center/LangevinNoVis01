@@ -72,6 +72,7 @@ public class MySystem {
     private final boolean countingClusters;
     private final SitePropertyCounter sitePropertyCounter;
     private final LocationTracker locationTracker;
+    private final ReactionCounter reactionCounter;
 
     // To assign molecule ids during creation reactions, it helps to have a
     // global molecule index.
@@ -94,10 +95,10 @@ public class MySystem {
 
     // Temporal system information.
     private final double totalTime;
-    private final double dt;
-    private final double dtspring;
-    private final double dtdata;
-    private final double dtimage;
+    private final double dt;            // simulation time step default 1.0E-8
+    private final double dtspring;      // spring interval default 1.0E-9
+    private final double dtdata;        // data output interval (when we update the counters) default 1.0E-4
+    private final double dtimage;       // image output interval default 1.0E-4
     // Current system time
     private double time = 0;
 
@@ -193,9 +194,9 @@ public class MySystem {
         vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"), VCellMessaging.ThrowOnException.NO);
 
         this.decayReactions = g.getDecayReactions();
-        bindingReactions = new BindingReactions(g);
-        transitionReactions = new TransitionReactions(g, bindingReactions);
-        allostericReactions = new AllostericReactions(g, bindingReactions);
+        bindingReactions = new BindingReactions(g, this);
+        transitionReactions = new TransitionReactions(g, this, bindingReactions);
+        allostericReactions = new AllostericReactions(g, this, bindingReactions);
 
         this.moleculeCounter = new MoleculeCounter(g, this);
         this.stateCounter = new StateCounter(g, this);
@@ -204,6 +205,9 @@ public class MySystem {
         this.clusterCounter = new ClusterCounter(g, this);
         this.sitePropertyCounter = new SitePropertyCounter(g,this);
         this.locationTracker = new LocationTracker(g, this);
+        this.reactionCounter = new ReactionCounter(g, this);
+
+        setReactionCounter(this);
 
         // Spatial informartion.
         double xsize = g.getXsize();
@@ -244,6 +248,12 @@ public class MySystem {
         // </editor-fold>
     }
 
+    private void setReactionCounter(MySystem mySystem) {
+        bindingReactions.setReactionCounter(mySystem);
+        transitionReactions.setReactionCounter(mySystem);
+        allostericReactions.setReactionCounter(mySystem);
+    }
+
     // **********************   GET METHODS **************************
 
     public ArrayList<Molecule> getMolecules(){
@@ -268,6 +278,10 @@ public class MySystem {
 
     public int getRunCounter(){
         return runCounter;
+    }
+
+    public ReactionCounter getReactionCounter() {
+        return reactionCounter;
     }
 
     // *********************  FOLDER MANAGEMENT ************************
@@ -563,6 +577,7 @@ public class MySystem {
                         if(bindingReactions.doReact(key1, key2)){
 //                            System.out.println("Looking for reaction.");
                             if(bindingReactions.checkForReaction(key1, key2)){
+                                reactionCounter.plusBindingReaction(bindingReactions.getName(key1, key2));
                                 Bond newBond = new Bond(site, tempSite,
                                         SpringConstant, bindingReactions.getOffProb(key1, key2),
                                         bindingReactions.getName(key1, key2),
@@ -833,6 +848,7 @@ public class MySystem {
             int reaction = decayReaction.getReaction(freeMolecules.size());
             if(reaction == 1){
                 addMolecule(gmol);
+                reactionCounter.plusCreationReaction(decayReaction.getName());
             } else if(reaction == -1){
                 // If this reaction occurs the number of free molecules must
                 // be greater than zero.
@@ -842,6 +858,7 @@ public class MySystem {
                 molecules.remove(tmol);
                 sites.removeAll(tmol.getSites());
                 links.removeAll(tmol.getLinks());
+                reactionCounter.plusDecayReaction(decayReaction.getName());
             }
         }
         // </editor-fold>
@@ -1006,6 +1023,7 @@ public class MySystem {
 //                Site s1 = bond.getSites()[1];
 //                String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
 //                System.out.println("Bond " + bond.getName() + " dissociates: " + who);
+                reactionCounter.plusDissociationReaction(bond.getName());
                 bondsToRemove.add(bond);
                 Site [] bsite = bond.getSites();
                 bsite[0].setBound(false);
@@ -1096,6 +1114,8 @@ public class MySystem {
                 sitePropertyCounter.countProperties();
 //                locationTracker.trackPositions();
 
+                reactionCounter.initDatapoint();    // we update in real time as reactions happen
+
                 nextDataTime += dtdata;
             }
             // Look to see if we should output an image
@@ -1150,6 +1170,9 @@ public class MySystem {
 
         sitePropertyCounter.writeData(dataFolder);
 //        locationTracker.writeData(dataFolder);
+
+        reactionCounter.writeFullData(dataFolder);
+
         System.out.println("Finished writing data.");
         // postprocess data
         // get file extension from inputFile

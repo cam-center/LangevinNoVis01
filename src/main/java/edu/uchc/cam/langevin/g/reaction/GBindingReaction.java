@@ -17,7 +17,7 @@ import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 
-public class GBindingReaction {
+public class GBindingReaction implements GReactionInterface{
 
     // Might want to name the reactions
     private String name;
@@ -76,6 +76,7 @@ public class GBindingReaction {
         this.name = name;
     }
 
+    @Override
     public String getName(){
         return name;
     }

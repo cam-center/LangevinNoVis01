@@ -14,7 +14,7 @@ import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 
-public class GTransitionReaction {
+public class GTransitionReaction implements  GReactionInterface {
     
     private String name;
     
@@ -70,7 +70,8 @@ public class GTransitionReaction {
     public void setName(String name){
         this.name = name;
     }
-    
+
+    @Override
     public String getName(){
         return name;
     }
