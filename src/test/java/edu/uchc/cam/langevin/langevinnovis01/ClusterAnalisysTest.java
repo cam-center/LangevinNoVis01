@@ -297,6 +297,7 @@ public class ClusterAnalisysTest {
             File clustersFile = new File(parent_dir, newClustersFileName);
             LangevinPostprocessor.writeClustersFile(runDataFolder.toPath(), clustersFile.toPath());
             Map<Double, LangevinPostprocessor.TimePointClustersInfo> loadedClusterInfoMap = NdJsonUtils.loadClusterInfoMapFromNDJSON(clustersFile.toPath());
+            assertNotNull(loadedClusterInfoMap, "loadedClusterInfoMap should not be null");
         }
         File[] jsonFiles = simulationFolder.listFiles((dir, name) -> name.toLowerCase().endsWith(".json"));
         assertNotNull(jsonFiles, "Directory listing failed or simulationFolder is not a directory");

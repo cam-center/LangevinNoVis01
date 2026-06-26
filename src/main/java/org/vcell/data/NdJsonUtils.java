@@ -22,8 +22,8 @@ public class NdJsonUtils {
                         LangevinPostprocessor.TimePointClustersInfo info = entry.getValue();
 
                         Map<String, Object> ndjsonObject = new LinkedHashMap<>();
-                        ndjsonObject.put("timePoint", timePoint);
-                        ndjsonObject.put("timePointClustersInfo", info);
+                        ndjsonObject.put("t", timePoint);   // timePoint
+                        ndjsonObject.put("ci", info);       // timePointClustersInfo
                         try {
                             writer.write(objectMapper.writeValueAsString(ndjsonObject));
                             writer.write("\n");
@@ -49,8 +49,8 @@ public class NdJsonUtils {
                         TypeFactory.defaultInstance().constructMapType(LinkedHashMap.class, String.class, Object.class));
 
                 // Extract timePoint and timePointClustersInfo
-                Double timePoint = (Double) ndjsonObject.get("timePoint");
-                LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = objectMapper.convertValue(ndjsonObject.get("timePointClustersInfo"),
+                Double timePoint = (Double) ndjsonObject.get("t");      // timePoint
+                LangevinPostprocessor.TimePointClustersInfo timePointClustersInfo = objectMapper.convertValue(ndjsonObject.get("ci"),    // timePointClustersInfo
                         LangevinPostprocessor.TimePointClustersInfo.class);
 
                 clusterInfoMap.put(timePoint, timePointClustersInfo);

@@ -209,13 +209,13 @@ public class LangevinPostprocessor {
     public static class ClusterInfo implements Serializable {  // info on a non-trivial cluster (2 molecules or more)
         private static final long serialVersionUID = 1L;
 
-        @JsonProperty("clusterIndex")
+        @JsonProperty("i")
         int clusterIndex = -1;
 
-        @JsonProperty("size")
+        @JsonProperty("s")
         public int size = 0;
 
-        @JsonProperty("clusterComponents")
+        @JsonProperty("c")
         Map<String, Integer> clusterComponents = new LinkedHashMap<>(); // key = molecule name, value = number of molecules in the cluster
 
         public int getClusterIndex() { return clusterIndex; }
