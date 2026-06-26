@@ -18,6 +18,7 @@ public class LangevinPostprocessor {
     public static final String FULL_BOND_DATA_CSV = "FullBondData.csv";
     public static final String FULL_COUNT_DATA_CSV = "FullCountData.csv";
     public static final String FULL_STATE_COUNT_DATA_CSV = "FullStateCountData.csv";
+    public static final String FULL_REACTION_DATA_CSV = "FullTotalReactionsCountData.csv";
     public static final String SITE_PROPERTY_DATA_CSV__NOT_USED_ = "SitePropertyData.csv";
     public static final String MOLECULE_IDS_CSV = "MoleculeIDs.csv";
     public static final String CLUSTERS_TIME_PREFIX = "Clusters_Time_";
@@ -34,24 +35,28 @@ public class LangevinPostprocessor {
         try (FileReader fullBondDataReader = new FileReader(new File(langevinOutputDir.toFile(), FULL_BOND_DATA_CSV));
              FileReader fullCountDataReader = new FileReader(new File(langevinOutputDir.toFile(), FULL_COUNT_DATA_CSV));
              FileReader fullStateCountDataReader = new FileReader(new File(langevinOutputDir.toFile(), FULL_STATE_COUNT_DATA_CSV));
+             FileReader fullReactionDataReader = new FileReader(new File(langevinOutputDir.toFile(), FULL_REACTION_DATA_CSV));
              //FileReader sitePropertyDataReader = new FileReader(langevinOutputDir + SITE_PROPERTY_DATA_CSV);
              //FileReader clustersTimeReader = new FileReader(langevinOutputDir + "Clusters_Time_.csv")
         ) {
             CSVParser fullBondData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullBondDataReader);
             CSVParser fullCountData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullCountDataReader);
             CSVParser fullStateCountData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullStateCountDataReader);
+            CSVParser fullReactionData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(fullReactionDataReader);
             //CSVParser sitePropertyData = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(sitePropertyDataReader);
             //CSVParser clustersTime = CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrailingDelimiter().withTrim().parse(clustersTimeReader);
 
             List<String> fullBondHeaders = fullBondData.getHeaderNames();
             List<String> fullCountHeaders = fullCountData.getHeaderNames();
             List<String> fullStateCountHeaders = fullStateCountData.getHeaderNames();
+            List<String> fullReactionHeaders = fullReactionData.getHeaderNames();
             //List<String> sitePropertyHeaders = sitePropertyData.getHeaderNames();
             //List<String> clustersTimeHeaders = clustersTime.getHeaderNames();
 
             var fullBondDataIter = fullBondData.iterator();
             var fullCountDataIter = fullCountData.iterator();
             var fullStateCountDataIter = fullStateCountData.iterator();
+            var fullReactionDataIter = fullReactionData.iterator();
             //var sitePropertyDataIter = sitePropertyData.iterator();
             //var clustersTimeIter = clustersTime.iterator();
 
@@ -62,6 +67,7 @@ public class LangevinPostprocessor {
             headers.addAll(fullBondHeaders.stream().filter(s -> !s.equals("Time")).toList());
             headers.addAll(fullCountHeaders.stream().filter(s -> !s.equals("Time")).toList());
             headers.addAll(fullStateCountHeaders.stream().filter(s -> !s.equals("Time")).toList());
+            headers.addAll(fullReactionHeaders.stream().filter(s -> !s.equals("Time")).toList());
             //headers.addAll(sitePropertyHeaders.stream().filter(s -> !s.equals("Time")).toList());
             //headers.addAll(clustersTimeHeaders.stream().filter(s -> !s.equals("Time")).toList());
             List<String> combined_headers = headers.stream().map(s -> s.replace(" ", "_").replace(":", "")).toList();
@@ -82,10 +88,11 @@ public class LangevinPostprocessor {
                     CSVRecord fullBondDataRecord = fullBondDataIter.hasNext() ? fullBondDataIter.next() : null;
                     CSVRecord fullCountDataRecord = fullCountDataIter.hasNext() ? fullCountDataIter.next() : null;
                     CSVRecord fullStateCountDataRecord = fullStateCountDataIter.hasNext() ? fullStateCountDataIter.next() : null;
+                    CSVRecord fullReactionDataRecord = fullReactionDataIter.hasNext() ? fullReactionDataIter.next() : null;
                     //CSVRecord sitePropertyDataRecord = sitePropertyDataIter.hasNext() ? sitePropertyDataIter.next() : null;
                     //CSVRecord clustersTimeRecord = clustersTimeIter.hasNext() ? clustersTimeIter.next() : null;
 
-                    if (fullBondDataRecord == null || fullCountDataRecord == null || fullStateCountDataRecord == null) {
+                    if (fullBondDataRecord == null || fullCountDataRecord == null || fullStateCountDataRecord == null || fullReactionDataRecord == null) {
                         break;
                     }
 
@@ -105,6 +112,9 @@ public class LangevinPostprocessor {
                     }
                     for (int i = 1; i < fullStateCountDataRecord.size(); i++) {
                         csvPrinter.print(fullStateCountDataRecord.get(i));
+                    }
+                    for (int i = 1; i < fullReactionDataRecord.size(); i++) {
+                        csvPrinter.print(fullReactionDataRecord.get(i));
                     }
                     //for (int i = 1; i < sitePropertyDataRecord.size(); i++) {
                     //    csvPrinter.print(sitePropertyDataRecord.get(i));

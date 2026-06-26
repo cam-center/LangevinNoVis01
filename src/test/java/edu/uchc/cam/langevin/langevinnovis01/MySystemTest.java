@@ -310,6 +310,10 @@ public class MySystemTest {
      * AllReactions.ssld is a file that was used to test a combination of all reaction types, including creation,
      * decay, state transition, allosteric, and bimolecular binding reactions
      * Also helped in implementation and debugging the reaction counter feature
+     * Good number for quick runs:
+     * MT0 - 4
+     * MT1 - 15
+     * Total time: 0.01
      */
     @Test
     public void allReactionsFromResource() throws IOException {

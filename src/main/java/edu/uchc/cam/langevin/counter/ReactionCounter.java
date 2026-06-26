@@ -92,37 +92,37 @@ public class ReactionCounter {
         }
     }
     public void printDetailedCounts() {
-        System.out.println("=== " + creationReaction + "s ===");
+        System.out.println("=== " + ReactionType.CREATION.longName + "s ===");
         for (String name : creations.keySet()) {
             int sum = 0;
             for (int v : creations.get(name)) sum += v;
             System.out.println(name + " " + sum);
         }
-        System.out.println("=== " + decayReaction + "s ===");
+        System.out.println("=== " + ReactionType.DECAY.longName + "s ===");
         for (String name : decays.keySet()) {
             int sum = 0;
             for (int v : decays.get(name)) sum += v;
             System.out.println(name + " " + sum);
         }
-        System.out.println("=== " + bindingReaction + "s ===");
+        System.out.println("=== " + ReactionType.BINDING.longName + "s ===");
         for (String name : bindings.keySet()) {
             int sum = 0;
             for (int v : bindings.get(name)) sum += v;
             System.out.println(name + " " + sum);
         }
-        System.out.println("=== " + dissociationReaction + "s ===");
+        System.out.println("=== " + ReactionType.DISSOCIATION.longName + "s ===");
         for (String name : dissociations.keySet()) {
             int sum = 0;
             for (int v : dissociations.get(name)) sum += v;
             System.out.println(name + " " + sum);
         }
-        System.out.println("=== " + transitionReaction + "s ===");
+        System.out.println("=== " + ReactionType.TRANSITION.longName + "s ===");
         for (String name : transitions.keySet()) {
             int sum = 0;
             for (int v : transitions.get(name)) sum += v;
             System.out.println(name + " " + sum);
         }
-        System.out.println("=== " + allostericReaction + "s ===");
+        System.out.println("=== " + ReactionType.ALLOSTERIC.longName + "s ===");
         for (String name : allosterics.keySet()) {
             int sum = 0;
             for (int v : allosterics.get(name)) sum += v;
@@ -131,12 +131,25 @@ public class ReactionCounter {
     }
 
 
-    private static final String creationReaction      = "CreationReaction";
-    private static final String decayReaction         = "DecayReaction";
-    private static final String bindingReaction       = "BindingReaction";
-    private static final String dissociationReaction  = "DissociationReaction";
-    private static final String transitionReaction    = "TransitionReaction";
-    private static final String allostericReaction    = "AllostericReaction";
+    public enum ReactionType {
+
+        CREATION("CreationReaction", "CREATION"),
+        DECAY("DecayReaction", "DECAY"),
+        BINDING("BindingReaction", "BINDING"),
+        DISSOCIATION("DissociationReaction", "UNBINDING"),
+        TRANSITION("TransitionReaction", "TRANSITION"),
+        ALLOSTERIC("AllostericReaction", "ALLOSTERIC");
+
+        public final String longName;
+        public final String shortName;
+        ReactionType(String longName, String shortName) {
+            this.longName = longName;
+            this.shortName = shortName;
+        }
+        public String formatColumnName(String reactionName) {
+            return shortName + "_" + reactionName;
+        }
+    }
 
     public void plusCreationReaction(String name) {
 //        System.out.println(" --------- " + creationReaction + ": " + name);
@@ -174,129 +187,58 @@ public class ReactionCounter {
      * @param path                                                    *
     \******************************************************************/
     public void writeFullData(File path) {
-//        writeCategoryCSV(path, "ShortTotalReactionsCountData", totals);
-//        writeCategoryCSV(path, "CreationReactionsCountData", creations);
-//        writeCategoryCSV(path, "DecayReactionsCountData", decays);
-//        writeCategoryCSV(path, "BindingReactionsCountData", bindings);
-//        writeCategoryCSV(path, "DissociationReactionsCountData", dissociations);
-//        writeCategoryCSV(path, "TransitionReactionsCountData", transitions);
-//        writeCategoryCSV(path, "AllostericReactionsCountData", allosterics);
-
-        // this is complete and with directionality preserved
-        writeFullTotalReactions(path);
-        System.out.println("ReactionCounter: all CSV files written.");
-    }
-
-    private void writeCategoryCSV(
-            File path,
-            String filename,
-            HashMap<String, int[]> map)
-    {
-        File out = new File(path, filename + ".csv");
-        try (PrintWriter p = new PrintWriter(new FileWriter(out), true)) {
-            // HEADER
-            p.print("Time,");
-            for (String name : map.keySet()) {
-                p.print(name + ",");
-            }
-            p.println();
-            // DATA ROWS
-            for (int i = 0; i < totalCount; i++) {
-                double t = Math.round(time[i] * 1e12) / 1e12;   // round to 12 decimal places
-                p.print(t + ",");
-                for (String name : map.keySet()) {
-                    p.print(map.get(name)[i] + ",");
-                }
-                p.println();
-            }
-        } catch (IOException e) {
-            e.printStackTrace(System.out);
-        }
-    }
-
-    public void writeFullTotalReactions(File path) {
 
         File out = new File(path, "FullTotalReactionsCountData.csv");
-
         try (PrintWriter p = new PrintWriter(new FileWriter(out), true)) {
-
             //
-            // HEADER
+            // ---------- HEADER
             //
             p.print("Time,");
-
-            // CreationReaction → keep name
             for (String name : creations.keySet()) {
-                p.print(name + ",");
+                p.print(ReactionType.CREATION.formatColumnName(name) + ",");
             }
-
-            // DecayReaction → name_reverse
             for (String name : decays.keySet()) {
-                p.print(name + "_reverse,");
+                p.print(ReactionType.DECAY.formatColumnName(name) + ",");
             }
-
-            // BindingReaction → keep name
             for (String name : bindings.keySet()) {
-                p.print(name + ",");
+                p.print(ReactionType.BINDING.formatColumnName(name) + ",");
             }
-
-            // DissociationReaction → name_reverse
             for (String name : dissociations.keySet()) {
-                p.print(name + "_reverse,");
+                p.print(ReactionType.DISSOCIATION.formatColumnName(name) + ",");
             }
-
-            // TransitionReaction → keep name
             for (String name : transitions.keySet()) {
-                p.print(name + ",");
+                p.print(ReactionType.TRANSITION.formatColumnName(name) + ",");
             }
-
-            // AllostericReaction → keep name
             for (String name : allosterics.keySet()) {
-                p.print(name + ",");
+                p.print(ReactionType.ALLOSTERIC.formatColumnName(name) + ",");
             }
-
             p.println();
-
-
             //
-            // DATA ROWS
+            // ---------- DATA ROWS
             //
             for (int i = 0; i < totalCount; i++) {
 
-                // Clean time rounding
-                double t = Math.round(time[i] * 1e12) / 1e12;
+                double t = Math.round(time[i] * 1e12) / 1e12;   // Clean time rounding
                 p.print(t + ",");
 
-                // CreationReaction
                 for (String name : creations.keySet()) {
                     p.print(creations.get(name)[i] + ",");
                 }
-
-                // DecayReaction
                 for (String name : decays.keySet()) {
                     p.print(decays.get(name)[i] + ",");
                 }
-
-                // BindingReaction
                 for (String name : bindings.keySet()) {
                     p.print(bindings.get(name)[i] + ",");
                 }
-
-                // DissociationReaction
                 for (String name : dissociations.keySet()) {
                     p.print(dissociations.get(name)[i] + ",");
                 }
-
-                // TransitionReaction
                 for (String name : transitions.keySet()) {
                     p.print(transitions.get(name)[i] + ",");
                 }
-
-                // AllostericReaction
                 for (String name : allosterics.keySet()) {
                     p.print(allosterics.get(name)[i] + ",");
                 }
-
                 p.println();
             }
 
