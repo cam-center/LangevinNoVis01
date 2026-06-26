@@ -1,6 +1,7 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.data.NdJsonUtils;
 import org.vcell.data.Resource;
@@ -114,16 +115,21 @@ public class ClusterAnalisysTest {
 
         // override for "classpath"
         sim_base_name = "SimID_35189106_0_";
+        String resourcesFolder = "simdata";
+        // TODO: comment out the next 2 lines before commit
+//        resourcesFolder = "all_reactions";
+//        sim_base_name = "sim";
+
         inputFileName = sim_base_name + ".langevinInput";
         NumRuns = 3;
 
         // // the resources are in  \resources\simdata, \resources is expressed in CLASSPATH
-        URL resourceInputFileUrl = Resource.getResource("simdata/" + inputFileName);
+        URL resourceInputFileUrl = Resource.getResource(resourcesFolder + "/" + inputFileName);
         if(resourceInputFileUrl == null) {
-            throw new IllegalArgumentException("Resource not found: 'simdata/" + inputFileName +"'");
+            throw new IllegalArgumentException("Resource not found: '" + resourcesFolder + "/" + inputFileName +"'");
         }
 
-        final String workDirName = "000_simdata";   // arbitrary prefix for our temp folder
+        final String workDirName = "000-langevintest";   // arbitrary prefix for our temp folder
         workDirPath = Files.createTempDirectory(workDirName);        // temp location for automatic testing
         workDirPathMap.put(workDirPath.toString(), workDirPath);
         parent_dir = workDirPath.toString();
@@ -135,7 +141,7 @@ public class ClusterAnalisysTest {
         boolean found = Files.lines(inputFilePath).anyMatch(line -> line.contains(inputFileValidityCheck));
         assertTrue(found, "File should contain the string: " + inputFileValidityCheck);
 
-        URL resourceSimDataFolderURL = Resource.getResource("simdata/" + sim_base_name + "_FOLDER/data");
+        URL resourceSimDataFolderURL = Resource.getResource(resourcesFolder + "/" + sim_base_name + "_FOLDER/data");
         simDataFolderPath = workDirPath.resolve(sim_base_name + "_FOLDER/data");
         Resource.copyFolderRecursively(resourceSimDataFolderURL, simDataFolderPath);
     }
@@ -298,6 +304,51 @@ public class ClusterAnalisysTest {
         System.out.println("done");
     }
 
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * This test exercises a more complex model where all reactions are used, also the ida files contain reaction statistics
+     * Use it to test the multi-run postprocessor functionality by calculating the primary statistics (avg, std, min, max)
+     * and the advanced statistics (cluster analysis) for all runs, and check that the expected files are created
+     */
+    @Test
+    public void testAllReactions() throws IOException, URISyntaxException {
+
+        //
+        // TODO: remember to override resourcesFolder and sim_base_name in classpathInitialization() for this test
+        // with:
+        //         resourcesFolder = "all_reactions";
+        //         sim_base_name = "sim";
+
+        if(inputSource == InputSource.RESOURCES) {  // more resource files needed specifically for this test
+            URL resourceWorkingDirUrl = Resource.getResource("all_reactions");
+            // this test needs the .json and .ida files
+            Resource.copyFilesWithExtension(resourceWorkingDirUrl, workDirPath, ClustersFileExtension);
+            Resource.copyFilesWithExtension(resourceWorkingDirUrl, workDirPath, IdaFileExtension);
+        }
+
+        VCellMessaging vcellMessaging = new VCellMessagingNoop();
+        File modelFile = new File(parent_dir, sim_base_name+".langevinInput");
+        File simulationFolder = new File(parent_dir);   // place of input file, and .ida and .json result files for all runs
+
+        Global g = new Global(modelFile);
+        ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 50, false, vcellMessaging);
+        cp.setSimulationFolder(simulationFolder);
+        cp.setNumRuns(NumRuns);
+        cp.setSimulationName(sim_base_name);
+
+        cp.calculateLangevinPrimaryStatistics();
+        File targetFile = new File(simulationFolder, sim_base_name + "_Avg.ida");
+        assertTrue(targetFile.exists(), "expected file " + sim_base_name + "_Avg.ida to exist");
+
+        cp.calculateLangevinAdvancedStatistics();   // cluster analysis
+        File[] csvFiles = simulationFolder.isDirectory() ?
+                simulationFolder.listFiles((dir, name) -> name.endsWith(".csv")) : new File[0];
+        // we get 3 advanced statistics files - unrelated to NumRuns!
+        assertTrue(3 == csvFiles.length, "number of .csv files should be equal to 3");
+
+        System.out.println("done");
+    }
 
 
 }
