@@ -191,10 +191,10 @@ public class LangevinPostprocessor {
     public static class TimePointClustersInfo implements Serializable {
         private static final long serialVersionUID = 1L;
 
-        @JsonProperty("timePointTotalClusters")
+        @JsonProperty("tot")
         public int timePointTotalClusters;                     // total clusters at this timepoint (trivial + non-trivial)
 
-        @JsonProperty("timePointClusterInfoList")
+        @JsonProperty("list")
         public List<ClusterInfo> timePointClusterInfoList = new ArrayList<>(); // non trivial clusters for this timepoint
 
         public int getTimePointTotalClusters() {
