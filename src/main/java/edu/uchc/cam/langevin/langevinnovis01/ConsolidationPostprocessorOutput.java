@@ -68,7 +68,6 @@ public class ConsolidationPostprocessorOutput {
         writeCsvFile(stdResultSet, ResultType.STD);
         writeCsvFile(minResultSet, ResultType.MIN);
         writeCsvFile(maxResultSet, ResultType.MAX);
-
     }
 
     private void writeCsvFile(SolverResultSet resultSet, ResultType resultType) throws IOException {

@@ -150,9 +150,10 @@ public class SolverResultSet {
                 throw new IOException("empty file: " + file.getName());
             }
 
-            List<String> reactions = new ArrayList<>();
-            List<MoleculeInfo> molecules = new ArrayList<>();
-            parseHeaders(headerLine, reactions, molecules);
+            // We don't need these. parseHeaders() does NOT reflect the modern naming conventions Do NOT use unless updated.
+//            List<String> reactions = new ArrayList<>();
+//            List<MoleculeInfo> molecules = new ArrayList<>();
+//            parseHeaders(headerLine, reactions, molecules);
 
 
             String[] headers = headerLine.split(HeaderSeparator);
@@ -171,13 +172,20 @@ public class SolverResultSet {
                 values.add(rowData);
             }
 
-            // evaluate triviality for each column
-            for (int i = 0; i < columnDescriptions.size(); i++) {
-                columnDescriptions.get(i).evaluateTriviality(values, i);
-            }
+//            // evaluate triviality for each column
+//            for (int i = 0; i < columnDescriptions.size(); i++) {
+//                columnDescriptions.get(i).evaluateTriviality(values, i);
+//            }
         }
     }
 
+    /**
+     * Legacy header parser.
+     * This method is not used anywhere in the current pipeline.
+     * It does NOT reflect the modern naming conventions (ReactionType, cluster naming, etc).
+     * Kept only as a reference for future refactoring. Should not be called.
+     */
+    @SuppressWarnings("unused")
     // separates entities in the header in bond type, molecule name, site name, state name
     // no use right now but may be useful in the future, we have molecules, reactions aso in Global
     public static void parseHeaders(String headerLine, List<String> reactions, List<MoleculeInfo> molecules) {

@@ -6,7 +6,6 @@ import java.util.Objects;
 public class ColumnDescription {
 
     private String variableName = new String();
-    private transient boolean isTrivial = false;
 
     public ColumnDescription(String variableName) {
         this.variableName = variableName;
@@ -19,19 +18,7 @@ public class ColumnDescription {
         this.variableName = variableName;
     }
 
-    public boolean isTrivial() {
-        return isTrivial;
-    }
-    public void setTrivial(boolean isTrivial) {
-        this.isTrivial = isTrivial;
-    }
-
-    public void evaluateTriviality(List<double[]> values, int columnIndex) {
-        double firstValue = values.get(0)[columnIndex];
-        isTrivial = values.stream().allMatch(row -> row[columnIndex] == firstValue);
-    }
-
-    @Override
+     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
@@ -46,9 +33,6 @@ public class ColumnDescription {
 
     @Override
     public String toString() {
-        return "ColumnDescription{" +
-                "variableName='" + variableName + '\'' +
-                ", isTrivial=" + isTrivial +
-                '}';
+        return "ColumnDescription{variableName='" + variableName + "'}";
     }
 }
