@@ -111,7 +111,7 @@ public class MySystem {
     // 2015-07-12 - Changing code to use a single viewer file. This will
     // dramatically cut down on storage space.
 //    private File viewerFolder;
-    private File viewerFile;
+    private File viewerFile = null;
     private File dataFolder;
 
     // When launching from the front end GUI, I want the system updates to go
@@ -371,8 +371,10 @@ public class MySystem {
         }
 
         // Now write the header file
-        viewerFile = new File(folder.toString() + "/viewer_files/", fileName + "_VIEW_Run" + runCounter + ".txt");
-        writeViewerFileHeader();
+        if(runCounter == 0){        // we only save movie for Run0
+            viewerFile = new File(folder.toString() + "/viewer_files/", fileName + "_VIEW_Run" + runCounter + ".txt");
+            writeViewerFileHeader();
+        }
         // </editor-fold>
     }
 
@@ -1206,6 +1208,9 @@ public class MySystem {
      \**********************************************************************/
 
     private void writeViewerFileHeader(){
+        if (viewerFile == null){
+            return;
+        }
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         try(PrintWriter p = new PrintWriter(new FileWriter(viewerFile), true)) {
             p.print("TotalTime\t" + totalTime + "\n");
@@ -1222,6 +1227,9 @@ public class MySystem {
 
     private void writePositions(){
         // <editor-fold defaultstate="collapsed" desc="Method Code">
+        if(viewerFile == null){
+            return;
+        }
         try(PrintWriter p = new PrintWriter(new FileWriter(viewerFile, true), true)) {
             p.print("SCENE\n");
             p.print("SceneNumber\t" + imageCounter + "\tCurrentTime"

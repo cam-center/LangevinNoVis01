@@ -169,8 +169,8 @@ public class BindingReactions {
         double onProbNew = 1.0 - Math.pow(Math.E, -(r.lambdaNew*dt));       // lambda dt -->  1 - e pow(-lambda dt)
         double offProbOld = r.getkoff()*dt;
         double offProbNew = 1.0 - Math.pow(Math.E, -(r.kOffIntrinsic*dt));
-        System.out.println(r.getName() + ": onProbability: " + onProbOld + ", " + onProbNew);
-        System.out.println(r.getName() + ": offProbability: " + offProbOld + ", " + offProbNew);
+//        System.out.println(r.getName() + ": onProbability: " + onProbOld + ", " + onProbNew);
+//        System.out.println(r.getName() + ": offProbability: " + offProbOld + ", " + offProbNew);
 
         hasReaction.put(key1+key2, Boolean.TRUE);
         // onProbs.put(key1+key2, r.getLambda()*dt);

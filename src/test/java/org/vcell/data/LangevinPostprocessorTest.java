@@ -170,7 +170,7 @@ public class LangevinPostprocessorTest {
     @Test
     void test_writeIdaFile() throws IOException {
         File idaFile = new File(tempDirectory.toFile().getAbsolutePath(), "output.ida");
-        writeIdaFile(tempDirectory, idaFile.toPath());
+        LangevinPostprocessor.writeIdaFile(tempDirectory, idaFile.toPath());
 
         String idaFileContent = Files.readString(idaFile.toPath());
         Assertions.assertEquals(normalizeLineEnds(expected_ida_content), normalizeLineEnds(idaFileContent));
