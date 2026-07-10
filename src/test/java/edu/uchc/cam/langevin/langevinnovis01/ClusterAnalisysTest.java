@@ -67,8 +67,8 @@ public class ClusterAnalisysTest {
     @BeforeAll
     public static void setUp() throws IOException {
         // comment out one or the other
-        inputSource = InputSource.RESOURCES;    // use this for automatc testing
-//        inputSource = InputSource.LOCAL;        // use this for testing from a local folder
+//        inputSource = InputSource.RESOURCES;    // use this for automatc testing
+        inputSource = InputSource.LOCAL;        // use this for testing from a local folder
     }
 
     /*
@@ -94,8 +94,12 @@ public class ClusterAnalisysTest {
             //
             // sim_base_name. inputFileName, parent_dir and NumRuns are initialized to null
             // must properly set them up here for "local" to your actual locations / names
-            parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big3";
-            sim_base_name = "SimID_35189106_0_";
+//            parent_dir = "C:/TEMP/langevin-cli-test/cluster_analysis_big3";
+//            sim_base_name = "SimID_35189106_0_";
+//            inputFileName = sim_base_name + ".langevinInput";
+//            NumRuns = 3;
+            parent_dir = "C:/TEMP/langevin-cli-test/hairball";
+            sim_base_name = "SimID_318661575_0_";
             inputFileName = sim_base_name + ".langevinInput";
             NumRuns = 3;
         } else {

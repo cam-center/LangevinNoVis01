@@ -160,13 +160,13 @@ public class ConsolidationPostprocessor {
 
                 int runIndex = entry.getKey();
                 LangevinPostprocessor.TimePointClustersInfo clusterInfo = entry.getValue();
-                ClusterStatisticsCalculator.Statistics stats = ClusterStatisticsCalculator.computeIndividualRunStatistics(clusterInfo, totalMolecules);
+                ClusterStatisticsCalculator.Statistics stats = ClusterStatisticsCalculator.computeIndividualRunStatistics(clusterInfo);
                 runStatisticsMap.put(runIndex, stats);
             }
             perTimepointPerRunStatistics.put(currentTimepointValue, runStatisticsMap);
 
             ClusterStatisticsCalculator.Statistics overallStats = ClusterStatisticsCalculator.computeOverallRunStatistics(
-                    allRunsAtTimepoint, totalMolecules);
+                    allRunsAtTimepoint);
             perTimepointOverallRunStatistics.put(currentTimepointValue, overallStats);
 
             ClusterStatisticsCalculator.Statistics meanStats = ClusterStatisticsCalculator.computeMeanRunStatistics(
