@@ -78,6 +78,9 @@ public class LambdaTest {
             double offProbOld = koff*dt[3];
             double kOffIntrinsic = getKOffIntrinsic(R, D, koff, rescalekon);
             double offProbNew = 1.0 - Math.pow(Math.E, -(kOffIntrinsic*dt[3]));
+            Assertions.assertFalse(Double.isNaN(offProbNew), "offProbNew is NaN: " + offProbNew);
+            Assertions.assertFalse(Double.isInfinite(offProbNew), "offProbNew is infinite: " + offProbNew);
+
             double relativeError = Math.abs((offProbOld - offProbNew) / offProbOld * 100.0);
             if(i==3) {      // compute only one relative error for off probability rate based on credible numbers
                 relativeOffProbabilityErrorCalculated = adjust(relativeError);

@@ -67,8 +67,8 @@ public class ClusterAnalisysTest {
     @BeforeAll
     public static void setUp() throws IOException {
         // comment out one or the other
-//        inputSource = InputSource.RESOURCES;    // use this for automatc testing
-        inputSource = InputSource.LOCAL;        // use this for testing from a local folder
+        inputSource = InputSource.RESOURCES;    // use this for automatc testing
+//        inputSource = InputSource.LOCAL;        // use this for testing from a local folder
     }
 
     /*

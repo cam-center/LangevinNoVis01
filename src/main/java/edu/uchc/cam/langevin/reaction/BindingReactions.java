@@ -171,6 +171,9 @@ public class BindingReactions {
         double offProbNew = 1.0 - Math.pow(Math.E, -(r.kOffIntrinsic*dt));
 //        System.out.println(r.getName() + ": onProbability: " + onProbOld + ", " + onProbNew);
 //        System.out.println(r.getName() + ": offProbability: " + offProbOld + ", " + offProbNew);
+        if (Double.isNaN(offProbNew) || Double.isInfinite(offProbNew)) {
+            System.out.println(r.getName() + ": BAD offProbability: " + offProbOld + ", " + offProbNew);
+        }
 
         hasReaction.put(key1+key2, Boolean.TRUE);
         // onProbs.put(key1+key2, r.getLambda()*dt);

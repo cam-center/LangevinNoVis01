@@ -161,7 +161,8 @@ public class OnRateSolver {
             
             count++;
             if(count > 10000000){
-                System.out.println("Took over 10,000,000 iterations to try to find a root using OnRateSolver.getroot().");
+                System.out.println("getrootIrreversible: finding a root using OnRateSolver.getroot() failed to converge.");
+                System.out.println("   p: " + p + ",  R: " + R + ",  D: " + D + ",  kon: " + kon + ",  g_min: " + g_min);
                 break;
             }
         }
@@ -226,7 +227,8 @@ public class OnRateSolver {
             count++;
             
             if(count > 10000000){
-                System.out.println("Took over 10,000,000 iterations to try to find a root using OnRateSolver.getroot().");
+                System.out.println("getrootReversible: finding a root using OnRateSolver.getroot() failed to converge.");
+                System.out.println("  p: " + p + ",  a: " + a + ",  R: " + R + ",  D: " + D + ",  kon: " + kon  + ",  g_min: " + g_min);
                 break;
             }
         }
