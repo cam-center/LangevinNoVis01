@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Log4j2 Level Hierarchy (most → least verbose)
+
+        TRACE  - extremely fine‑grained diagnostic output
+        DEBUG  - detailed debugging information
+        INFO   - routine operational messages (default "always show")
+        WARN   - something unexpected but not fatal
+        ERROR  - an operation failed; something is broken
+        FATAL  - the system is unusable; immediate attention required
+        OFF    - disable all logging
+
+    Rule: Setting <Root level="X"> shows X and everything BELOW it in this list.
+          Example: level="info" shows INFO, WARN, ERROR, FATAL.
+                   level="debug" shows DEBUG, INFO, WARN, ERROR, FATAL.
+                   level="trace" shows everything.
+-->
+
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+<!--            <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{36} - %msg%n"/>  -->
+            <PatternLayout pattern="%msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

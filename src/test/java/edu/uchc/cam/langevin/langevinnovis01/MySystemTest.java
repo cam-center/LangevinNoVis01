@@ -1,5 +1,8 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.counter.ReactionCounter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
@@ -17,6 +20,8 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class MySystemTest {
+
+    Logger lg = LogManager.getLogger(MySystemTest.class);
 
     String inputFileContents =
             """
@@ -105,11 +110,6 @@ public class MySystemTest {
             *** REACTION ANNOTATIONS ***
             """;
 
-//    String expected_idafile_contents_2_lines2 = """
-//            t:r1:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT0__Site1__state0:FREE_MT0__Site1__state0:BOUND_MT0__Site1__state0:TOTAL_MT0__Site1__state1:FREE_MT0__Site1__state1:BOUND_MT0__Site1__state1
-//            0.0 0 20 20 0 20 20 0 20 20 0 0 0 0
-//            """;
-
     String expected_idafile_contents_2_lines = """
             t:r1:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT0__Site1__state0:FREE_MT0__Site1__state0:BOUND_MT0__Site1__state0:TOTAL_MT0__Site1__state1:FREE_MT0__Site1__state1:BOUND_MT0__Site1__state1:CREATION_MT0:DECAY_MT0:BINDING_r1:UNBINDING_r1:TRANSITION_r0
             0.0 0 20 20 0 20 20 0 20 20 0 0 0 0 0 0 0 0 0
@@ -147,6 +147,8 @@ public class MySystemTest {
             String idaFileContents = Files.readString(idaFile);
             Assertions.assertTrue(idaFileContents.startsWith(expected_idafile_contents_2_lines));
             System.out.println(idaFileContents.substring(0,500)+"\n...\n"+idaFileContents.substring(idaFileContents.length()-500));
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
@@ -172,6 +174,8 @@ public class MySystemTest {
 
             MySystem sys = new MySystem(g, 0, true, vcellMessaging);
             assertNotNull(sys);
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             logFile.delete();
         }
@@ -212,6 +216,8 @@ public class MySystemTest {
             sys.runSystem();
             Assertions.assertTrue(Files.exists(idaFile));
 
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
@@ -258,6 +264,8 @@ public class MySystemTest {
             sys.runSystem();
             Assertions.assertTrue(Files.exists(idaFile));
 
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
@@ -304,6 +312,8 @@ public class MySystemTest {
             sys.runSystem();
             Assertions.assertTrue(Files.exists(idaFile));
 
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
@@ -355,9 +365,33 @@ public class MySystemTest {
             sys.getReactionCounter().printCounts();
             sys.getReactionCounter().printDetailedCounts();
             System.out.println("done");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
+    }
+
+    // do not run on github actions, I just want to experiment with logger
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    @Test
+    public void loggerTest() {
+
+        System.out.println("Debug message");
+        System.out.println("Info message");
+        System.out.println("Error message\n");
+
+        if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+            System.out.println("Logger level is DEBUG");
+        } else {
+            System.out.println("Logger level is " + lg.getLevel());
+        }
+        System.out.println("");
+
+        lg.debug("Debug message");
+        lg.info("Info message");
+        lg.error("Error message");
+
     }
 
 }
