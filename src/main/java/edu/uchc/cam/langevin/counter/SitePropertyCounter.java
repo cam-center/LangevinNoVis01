@@ -183,7 +183,7 @@ public class SitePropertyCounter {
             + gsite.getIndex() + ",Site Type, " + gsite.getTypeName());
         p.print("Time, Free, Bound,");
         for(GState state : gsite.getType().getStates()){
-            p.print(state.getName() + ",");
+            p.print(state.getStateName() + ",");
         }
         ArrayList<String> rNames = reactionNames.get(molID+index);
         for(String name : rNames){

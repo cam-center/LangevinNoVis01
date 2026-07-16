@@ -278,7 +278,7 @@ public class Global {
                 this.putTypeName(ttype.getID(), ttype.getName());
                 ArrayList<GState> tstates = ttype.getStates();
                     for (GState tstate : tstates) {
-                        this.putStateName(tstate.getID(), tstate.getName());
+                        this.putStateName(tstate.getID(), tstate.getStateName());
                     }
             }
             moleculeID++;

@@ -9,9 +9,13 @@ import java.io.PrintWriter;
 import java.util.Scanner;
 import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GDecayReaction implements GReactionInterface{
-    
+
+    public static final Logger lg = LogManager.getLogger(GDecayReaction.class);
+
     private double kcreate;  // units uM/s
     private double kdecay;   // units 1/s
     
@@ -48,12 +52,12 @@ public class GDecayReaction implements GReactionInterface{
     
     public void setCreationProbability(double dt, double volume){
         probCreate = 602.0*dt*volume*kcreate/(1000*1000*1000);
-        // System.out.println("probCreate = " + probCreate + " for " + this.getName());
+        lg.trace("probCreate = " + probCreate + " for " + this.getName());
     }
     
     public void setDecayProbability(double dt){
         probDecay = dt*kdecay;
-        // System.out.println("probDecay = " + probDecay + " for " + this.getName());
+        lg.trace("probDecay = " + probDecay + " for " + this.getName());
     }
     
     /* **************  LOAD FILE *****************************/
@@ -102,10 +106,10 @@ public class GDecayReaction implements GReactionInterface{
     public int getReaction(int freeMolecules){
         double rand = Rand.randomPosDouble();
         if(rand < probCreate){
-            // System.out.println("Should try to make a molecule.");
+            lg.trace("Should try to make a molecule.");
             return 1;
         } else if (rand < probCreate + freeMolecules*probDecay){
-            // System.out.println("Should try to destroy a molecule.");
+            lg.trace("Should try to destroy a molecule.");
             return -1;
         } else {
             return 0; 

@@ -121,7 +121,7 @@ public class GSiteType {
     public GState getState(String name){
         GState s = null;
         for (GState ts : states) {
-            if(ts.getName().equals(name)){
+            if(ts.getStateName().equals(name)){
                 s = ts;
                 break;
             }

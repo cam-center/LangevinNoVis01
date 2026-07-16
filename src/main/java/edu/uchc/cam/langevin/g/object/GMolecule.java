@@ -232,7 +232,7 @@ public class GMolecule {
     
     public Molecule newInstance(int id_mol, MyVector pos){
         // <editor-fold defaultstate="collapsed" desc="Method Code">  
-        Molecule mol =  new Molecule(id_mol, gmolID, location, is2d);
+        Molecule mol =  new Molecule(id_mol, gmolID, name, location, is2d);
         // The coordinates of membrane molecules must be shifted so that the 
         // anchors lie on the membrane. 
         double zshift = 0;

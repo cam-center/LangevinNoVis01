@@ -16,6 +16,7 @@ public class Molecule {
     private final int location;
     // The GMolecule id for this molecule.
     private final int gId;
+    private final String gName;
     
     private final ArrayList<Site> sites = new ArrayList<>();
     private final ArrayList<Link> links = new ArrayList<>();
@@ -45,9 +46,10 @@ public class Molecule {
     // not shuffled.  What a pain.
     private final ArrayList<Site> originalSiteArray = new ArrayList<>();
     
-    public Molecule(int id, int gId, int location, boolean is2d){
+    public Molecule(int id, int gId, String gName, int location, boolean is2d){
         this.id = id;
         this.gId = gId;
+        this.gName = gName;
         this.location = location;
         this.is2d = is2d;
     }
@@ -57,15 +59,19 @@ public class Molecule {
     public int getID(){
         return id;
     }
-    
     public int getGID(){
         return gId;
     }
-    
+    public String getGName() {
+        return gName;
+    }
     public int getLocation(){
         return location;
     }
-    
+    public boolean is2D(){
+        return is2d;
+    }
+
     public String getLocationName(){
         return Location.locationName[location];
     }
@@ -91,11 +97,7 @@ public class Molecule {
     public boolean isBound(){
         return isBound;
     }
-    
-    public boolean is2D(){
-        return is2d;
-    }
-    
+
     public int getBondNumber(){
         return bondNumber;
     }

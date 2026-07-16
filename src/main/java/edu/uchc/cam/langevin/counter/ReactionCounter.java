@@ -12,9 +12,13 @@ import java.util.LinkedHashMap;
 import edu.uchc.cam.langevin.g.reaction.*;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 public class ReactionCounter {
+
+    public static final Logger lg = LogManager.getLogger(ReactionCounter.class);
 
     private final MySystem sys;
 
@@ -81,52 +85,52 @@ public class ReactionCounter {
 
     // utility method, we display the total number of occurrences for each reaction type at the end of the simulation
     public void printCounts() {
-        System.out.println("=== AllReactions ===");
+        lg.info("=== AllReactions ===");
         for (String name : totals.keySet()) {
             int[] arr = totals.get(name);
             int total = 0;
             for (int v : arr) {
                 total += v;
             }
-            System.out.println(name + " " + total);
+            lg.info(name + " " + total);
         }
     }
     public void printDetailedCounts() {
-        System.out.println("=== " + ReactionType.CREATION.longName + "s ===");
+        lg.info("=== " + ReactionType.CREATION.longName + "s ===");
         for (String name : creations.keySet()) {
             int sum = 0;
             for (int v : creations.get(name)) sum += v;
-            System.out.println(name + " " + sum);
+            lg.info(name + " " + sum);
         }
-        System.out.println("=== " + ReactionType.DECAY.longName + "s ===");
+        lg.info("=== " + ReactionType.DECAY.longName + "s ===");
         for (String name : decays.keySet()) {
             int sum = 0;
             for (int v : decays.get(name)) sum += v;
-            System.out.println(name + " " + sum);
+            lg.info(name + " " + sum);
         }
-        System.out.println("=== " + ReactionType.BINDING.longName + "s ===");
+        lg.info("=== " + ReactionType.BINDING.longName + "s ===");
         for (String name : bindings.keySet()) {
             int sum = 0;
             for (int v : bindings.get(name)) sum += v;
-            System.out.println(name + " " + sum);
+            lg.info(name + " " + sum);
         }
-        System.out.println("=== " + ReactionType.DISSOCIATION.longName + "s ===");
+        lg.info("=== " + ReactionType.DISSOCIATION.longName + "s ===");
         for (String name : dissociations.keySet()) {
             int sum = 0;
             for (int v : dissociations.get(name)) sum += v;
-            System.out.println(name + " " + sum);
+            lg.info(name + " " + sum);
         }
-        System.out.println("=== " + ReactionType.TRANSITION.longName + "s ===");
+        lg.info("=== " + ReactionType.TRANSITION.longName + "s ===");
         for (String name : transitions.keySet()) {
             int sum = 0;
             for (int v : transitions.get(name)) sum += v;
-            System.out.println(name + " " + sum);
+            lg.info(name + " " + sum);
         }
-        System.out.println("=== " + ReactionType.ALLOSTERIC.longName + "s ===");
+        lg.info("=== " + ReactionType.ALLOSTERIC.longName + "s ===");
         for (String name : allosterics.keySet()) {
             int sum = 0;
             for (int v : allosterics.get(name)) sum += v;
-            System.out.println(name + " " + sum);
+            lg.info(name + " " + sum);
         }
     }
 
@@ -152,32 +156,32 @@ public class ReactionCounter {
     }
 
     public void plusCreationReaction(String name) {
-//        System.out.println(" --------- " + creationReaction + ": " + name);
+        lg.debug(" --------- " + ReactionType.CREATION.longName + ": " + name);
         totals.get(name)[counter]++;
         creations.get(name)[counter]++;
     }
     public void plusDecayReaction(String name) {
-//        System.out.println(" --------- " + decayReaction + ": " + name);
+        lg.debug(" --------- " + ReactionType.DECAY.longName + ": " + name);
         totals.get(name)[counter]++;
         decays.get(name)[counter]++;
     }
     public void plusBindingReaction(String name) {
-//        System.out.println(" --------- " + bindingReaction + ": " + name);
+        lg.debug(" --------- " + ReactionType.BINDING.longName + ": " + name);
         totals.get(name)[counter]++;
         bindings.get(name)[counter]++;
     }
     public void plusDissociationReaction(String name) {
-//        System.out.println(" --------- " + dissociationReaction + ": " + name);
+        lg.debug(" --------- " + ReactionType.DISSOCIATION.longName + ": " + name);
         totals.get(name)[counter]++;
         dissociations.get(name)[counter]++;
     }
     public void plusTransitionReaction(String name) {
-//        System.out.println(" --------- " + transitionReaction + ": " + name);
+        lg.debug(" --------- " + ReactionType.TRANSITION.longName + ": " + name);
         totals.get(name)[counter]++;
         transitions.get(name)[counter]++;
     }
     public void plusAllostericReaction(String name) {
-//        System.out.println(" --------- " + allostericReaction + ": " + name);
+        lg.debug(" --------- " + ReactionType.ALLOSTERIC.longName + ": " + name);
         totals.get(name)[counter]++;
         allosterics.get(name)[counter]++;
     }

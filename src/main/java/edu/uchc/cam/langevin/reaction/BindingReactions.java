@@ -19,8 +19,12 @@ import java.util.HashMap;
 import edu.uchc.cam.langevin.helpernovis.Rand;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class BindingReactions {
+
+    public static final Logger lg = LogManager.getLogger(BindingReactions.class);
 
     private final HashMap<String, Boolean> hasReaction;
     // I'm just going to store the product lambda*dt, which is the actual quantity of interest.
@@ -116,33 +120,32 @@ public class BindingReactions {
 
                             if(reactionTypes[0] == type1 && reactionTypes[1] == type2){
                                 GState [] reactionState = reaction.getStates();
-                                if(reactionState[0].getName().equals(GBindingReaction.ANY_STATE_STRING) && reactionState[1].getName().equals(GBindingReaction.ANY_STATE_STRING)){
+                                if(reactionState[0].getStateName().equals(GBindingReaction.ANY_STATE_STRING) && reactionState[1].getStateName().equals(GBindingReaction.ANY_STATE_STRING)){
                                     foundReaction = true;
                                     addReaction(key1,key2,reaction,dt);
                                     break;
                                 }
-                                else if(reactionState[0].getName().equals(GBindingReaction.ANY_STATE_STRING) && reactionState[1] == state2){
+                                else if(reactionState[0].getStateName().equals(GBindingReaction.ANY_STATE_STRING) && reactionState[1] == state2){
                                     foundReaction = true;
                                     addReaction(key1,key2,reaction,dt);
                                     break;
                                 }
-                                else if(reactionState[0] == state1 && reactionState[1].getName().equals(GBindingReaction.ANY_STATE_STRING)){
+                                else if(reactionState[0] == state1 && reactionState[1].getStateName().equals(GBindingReaction.ANY_STATE_STRING)){
                                     foundReaction = true;
                                     addReaction(key1,key2,reaction,dt);
                                     break;
                                 }
                                 else if(reactionState[0] == state1 && reactionState[1] == state2){
                                     foundReaction = true;
-//                                    System.out.println("Found reaction between " + state1.getAbsoluteName() + " and " + state2.getAbsoluteName());
-//                                    System.out.println("State ids " + key1 + ", " + key2);
+                                    lg.trace("Found reaction between " + state1.getAbsoluteName() + " and " + state2.getAbsoluteName());
+                                    lg.trace("State ids " + key1 + ", " + key2);
                                     addReaction(key1,key2,reaction,dt);
-//                                    System.out.println(doReact(key1,key2) + ", " + doReact(key2, key1));
                                     break;
                                 }
                             }
                         }
                         if(!foundReaction){
-//                            System.out.println("did not find reaction between " + state1.getAbsoluteName() + " and " + state2.getAbsoluteName());
+                            lg.trace("did not find reaction between " + state1.getAbsoluteName() + " and " + state2.getAbsoluteName());
                             // Because of the way I'm looping and assigning the
                             // reactions, it can occur that a reaction could
                             // get assigned here twice, which would override
@@ -169,10 +172,13 @@ public class BindingReactions {
         double onProbNew = 1.0 - Math.pow(Math.E, -(r.lambdaNew*dt));       // lambda dt -->  1 - e pow(-lambda dt)
         double offProbOld = r.getkoff()*dt;
         double offProbNew = 1.0 - Math.pow(Math.E, -(r.kOffIntrinsic*dt));
-//        System.out.println(r.getName() + ": onProbability: " + onProbOld + ", " + onProbNew);
-//        System.out.println(r.getName() + ": offProbability: " + offProbOld + ", " + offProbNew);
+        lg.trace(r.getName() + ": onProbability: " + onProbOld + ", " + onProbNew);
+        lg.trace(r.getName() + ": offProbability: " + offProbOld + ", " + offProbNew);
+        if (Double.isNaN(offProbOld) || Double.isInfinite(offProbOld)) {    // not used, but we may want to investigate
+            lg.debug("Invalid offProbability (old) " + offProbOld + " for reaction '" + r.getName() + "'");
+        }
         if (Double.isNaN(offProbNew) || Double.isInfinite(offProbNew)) {
-            System.out.println(r.getName() + ": BAD offProbability: " + offProbOld + ", " + offProbNew);
+            throw new IllegalStateException("Invalid offProbability (new) " + offProbNew + " for reaction '" + r.getName());
         }
 
         hasReaction.put(key1+key2, Boolean.TRUE);
@@ -192,11 +198,18 @@ public class BindingReactions {
         bondLengths.put(key2+key1, r.getBondLength());
     }
 
-    public boolean doReact(String key1, String key2){
-        Boolean res = hasReaction.get(key1+key2);
-//        if(res == null) {
-//            System.out.println("hasReaction was null for the key pair (" + key1 + ", " + key2 + ").");
-//        }
+    public boolean doReact(GState state1, GState state2){
+        String key1 = state1.getIdAsString();
+        String key2 = state2.getIdAsString();
+        Boolean res = hasReaction.get(key1 + key2);
+        if (res == null) {
+            String fullName1 = state1.getAbsoluteNameBngl();
+            String fullName2 = state2.getAbsoluteNameBngl();
+            throw new IllegalStateException(
+                    "Reaction lookup failed: no entry for key pair " + key1 + ", " + key2 + ". " +
+                    "Full names: " + fullName1 + ", " + fullName2 + "."
+            );
+        }
         return res;
     }
 

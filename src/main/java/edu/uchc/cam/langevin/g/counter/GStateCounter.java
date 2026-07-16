@@ -76,7 +76,7 @@ public class GStateCounter {
     }
     
     public String getGStateName(){
-        return gstate.getName();
+        return gstate.getStateName();
     }
     
     public int getGStateID(){
@@ -112,8 +112,8 @@ public class GStateCounter {
     public void writeStateCounter(PrintWriter p){
         StringBuilder sb = new StringBuilder();
         sb.append("'").append(gstate.getMoleculeName()).append("' : '");
-        sb.append(gstate.getTypeName()).append("' : '");
-        sb.append(gstate.getName()).append("'");
+        sb.append(gstate.getSiteTypeName()).append("' : '");
+        sb.append(gstate.getStateName()).append("'");
         sb.append(" : Measure ");
         if(!countBound && !countFree && !countTotal){
             sb.append(NONE).append(" ");

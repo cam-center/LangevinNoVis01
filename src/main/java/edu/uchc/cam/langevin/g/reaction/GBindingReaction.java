@@ -16,8 +16,12 @@ import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GBindingReaction implements GReactionInterface{
+
+    public static final Logger lg = LogManager.getLogger(GBindingReaction.class);
 
     // Might want to name the reactions
     private String name;
@@ -103,7 +107,7 @@ public class GBindingReaction implements GReactionInterface{
     }
 
     private void setLambda() {
-        // System.out.println("BindingReaction: " + name + ", setLambda() called.");
+        lg.trace("BindingReaction: " + name + ", setLambda() called.");
         // conversion when going from concentration‑based kinetics to particle‑based / spatial stochastic kinetics
         // rescale kon from 1/(uM*s) to nm^3/s
         // 1uM = 10^-6 molecules/l, multiply by NA = 6.022e23 molecules/mol to get 6.022e17 molecules/liter
@@ -153,7 +157,7 @@ public class GBindingReaction implements GReactionInterface{
                     + "Kon: " + kon + " uM^-1 s^-1");
         }
         lambdaNew = kOnIntrinsic / volReact;
-//        System.out.println("  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
+        lg.trace("  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
 
         // if kon is 0 (pure dissociation), then the normal formula for kOffIntrinsic will give NaN
         // because we divide by rescalekon == 0.  In that case, we just set kOffIntrinsic = koff.
@@ -274,11 +278,6 @@ public class GBindingReaction implements GReactionInterface{
 
         // MUST SET LAMBDA HERE.  I FORGOT TO DO THIS AT FIRST!
         setLambda();
-//        // If lambda*dt is too big give a warning.
-//        if(lambdaOld*g.getdt() > 0.05){
-//            System.out.println("WARNING: lambda*dt = " + lambdaOld*g.getdt() + "."
-//                    + " For accurate results you want lambda*dt << 0.01.");
-//        }
         // </editor-fold>
     }
 

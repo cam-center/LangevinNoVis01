@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class MySystemTest {
 
-    Logger lg = LogManager.getLogger(MySystemTest.class);
+    public static final Logger lg = LogManager.getLogger(MySystemTest.class);
 
     String inputFileContents =
             """
@@ -146,7 +146,7 @@ public class MySystemTest {
             Assertions.assertTrue(Files.exists(idaFile));
             String idaFileContents = Files.readString(idaFile);
             Assertions.assertTrue(idaFileContents.startsWith(expected_idafile_contents_2_lines));
-            System.out.println(idaFileContents.substring(0,500)+"\n...\n"+idaFileContents.substring(idaFileContents.length()-500));
+            lg.debug(idaFileContents.substring(0,500)+"\n...\n"+idaFileContents.substring(idaFileContents.length()-500));
         } catch (Exception e) {
             Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
@@ -372,26 +372,26 @@ public class MySystemTest {
         }
     }
 
-    // do not run on github actions, I just want to experiment with logger
-    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    // Logger sanity check. Confirms that Log4j2 configuration is found on the classpath,
+    // that the logger instance lg is valid and that the logger is working. This test should always pass.
     @Test
     public void loggerTest() {
 
-        System.out.println("Debug message");
-        System.out.println("Info message");
-        System.out.println("Error message\n");
+        Assertions.assertDoesNotThrow(() -> {
 
-        if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
-            System.out.println("Logger level is DEBUG");
-        } else {
-            System.out.println("Logger level is " + lg.getLevel());
-        }
-        System.out.println("");
+            System.out.println("Logger test");
 
-        lg.debug("Debug message");
-        lg.info("Info message");
-        lg.error("Error message");
+            if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+                System.out.println("Logger level is DEBUG");
+            } else {
+                System.out.println("Logger level is " + lg.getLevel());
+            }
 
+            lg.debug("Debug message");
+            lg.info("Info message");
+            lg.error("Error message");
+
+        });         // no exception should be thrown
     }
 
 }

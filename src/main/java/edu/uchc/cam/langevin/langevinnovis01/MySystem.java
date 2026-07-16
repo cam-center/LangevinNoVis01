@@ -17,6 +17,8 @@ import edu.uchc.cam.langevin.object.*;
 import edu.uchc.cam.langevin.reaction.AllostericReactions;
 import edu.uchc.cam.langevin.reaction.BindingReactions;
 import edu.uchc.cam.langevin.reaction.TransitionReactions;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.WorkerEvent;
@@ -33,6 +35,8 @@ import java.util.List;
 import java.util.Random;
 
 public class MySystem {
+
+    public static final Logger lg = LogManager.getLogger(MySystem.class);
 
     public static final String IdaFileExtension = ".ida";
     public static final String ClustersFileExtension = ".json";
@@ -164,7 +168,7 @@ public class MySystem {
      * @param useOutputFile
     \**********************************************************************/
 
-    public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging){
+    public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging) throws IOException {
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         // if an explicit start random seed was found in the input file, we use it and runCounter
         // // to generate a unique seed for this run, otherwise we just use the current time
@@ -184,7 +188,7 @@ public class MySystem {
             Rand.seedRand(seed);
             rand = new Random(seed);
         }
-        System.out.println("in solver, running: " + runCounter);
+        lg.info("in solver, running: " + runCounter);
 
         this.g = g;
         this.runCounter = runCounter;
@@ -285,7 +289,7 @@ public class MySystem {
     }
 
     // *********************  FOLDER MANAGEMENT ************************
-    private void folderSetup(){
+    private void folderSetup() throws IOException {
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         // File information and file setup.
         inputFile = g.getInputFile();
@@ -298,7 +302,8 @@ public class MySystem {
         if (dotIndex > 0) {
             fileName = fileName.substring(0, dotIndex);
         } else {
-            System.out.println("Expected an extension for the input file: " + fileName);
+            // useless to also log error with same info
+            throw new IllegalArgumentException("Input file must have an extension: " + fileName);
         }
 
         /* Check to see if the file is already in a folder named fileName_FOLDER
@@ -318,7 +323,7 @@ public class MySystem {
                 try{
                     Files.copy(inputFile.toPath(), folder.toPath().resolve(inputFile.toPath().getFileName()),StandardCopyOption.REPLACE_EXISTING );
                 } catch(IOException e){
-                    System.out.println("File copy failed in MySystem constructor.");
+                    throw new IOException("Failed to copy input file to working folder", e);
                 }
             }
         }
@@ -330,7 +335,7 @@ public class MySystem {
             } catch(FileAlreadyExistsException fe){
                 // Ignore this exception.
             } catch(IOException e){
-                System.out.println("'images' folder creation failed in MySystem constructor.");
+                lg.warn("'images' folder creation failed in MySystem constructor.");
             }
 
             try{
@@ -338,7 +343,7 @@ public class MySystem {
             } catch(FileAlreadyExistsException fe){
                 // Ignore this exception.
             } catch(IOException e){
-                System.out.println("'videos' folder creation failed in MySystem constructor.");
+                lg.warn("'videos' folder creation failed in MySystem constructor.");
             }
 
             try{
@@ -346,7 +351,7 @@ public class MySystem {
             } catch(FileAlreadyExistsException fe){
                 // Ignore this exception.
             } catch(IOException e){
-                System.out.println("'videos' folder creation failed in MySystem constructor.");
+                lg.warn("'videos' folder creation failed in MySystem constructor.");
             }
         }
 
@@ -357,7 +362,7 @@ public class MySystem {
 //        } catch(FileAlreadyExistsException fe){
 //            viewerFolder = new File(folder.toString() + "/viewer_files/Run" + runCounter);
 //        } catch(IOException e){
-//            System.out.println("'viewer_files' folder creation failed in MySystem constructor.");
+//            lg.info("'viewer_files' folder creation failed in MySystem constructor.");
 //            viewerFolder = null;
 //        }
 
@@ -366,8 +371,8 @@ public class MySystem {
         } catch(FileAlreadyExistsException fe){
             dataFolder = new File(folder.toString() + "/data/Run" + runCounter);
         } catch(IOException e){
-            System.out.println("'data' folder creation failed in MySystem constructor.");
             dataFolder = null;
+            throw new IOException("Failed to create data folder for Run " + runCounter, e);
         }
 
         // Now write the header file
@@ -571,13 +576,13 @@ public class MySystem {
                         GState state2 = tempSite.getState();
                         String key1 = state1.getIdAsString();
                         String key2 = state2.getIdAsString();
-//                        System.out.println("--- (state1, state2) = (" + state1.getName() + ", " + state2.getName() + ")");
-//                        System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
+                        lg.trace("--- (state1, state2) = (" + state1.getStateName() + ", " + state2.getStateName() + ")");
+                        lg.trace("(key1, key2) = (" + key1 + ", " + key2 + ")");
 
                         // Now make sure the sites actually react (if they don't
                         // then this prevents an unnecessary random number generation).
-                        if(bindingReactions.doReact(key1, key2)){
-//                            System.out.println("Looking for reaction.");
+                        if(bindingReactions.doReact(state1, state2)){
+                            lg.trace("Looking for binding reaction.");
                             if(bindingReactions.checkForReaction(key1, key2)){
                                 reactionCounter.plusBindingReaction(bindingReactions.getName(key1, key2));
                                 Bond newBond = new Bond(site, tempSite,
@@ -605,10 +610,11 @@ public class MySystem {
                                     }
                                     m1.plusBond();
                                 }
-//                                Site s0 = newBond.getSites()[0];
-//                                Site s1 = newBond.getSites()[1];
-//                                String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
-//                                System.out.println("Binding reaction occured: " + bindingReactions.getName(key1, key2) + " between " + who);
+                                if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+                                    String thisWho = m0.getGName() + "(" + site.getType() + "~" + site.getState().getStateName() + ")";
+                                    String thatWho = m1.getGName() + "(" + tempSite.getType() + "~" + tempSite.getState().getStateName() + ")";
+                                    lg.debug("Binding reaction : " + bindingReactions.getName(key1, key2) + " between " + thisWho + " + " + thatWho);
+                                }
                             }
                         }
                     }
@@ -637,9 +643,8 @@ public class MySystem {
             ArrayList<Site> newSites = tempMol.getSites();
             overlap = siteOverlap(newSites);
             counter++;
-            if(counter > 100000){
-                System.out.println("Could not place the molecule after " + counter + " tries.");
-                break;
+            if (counter > 100000) {
+                throw new IllegalStateException("Failed to place molecule '" + gmolecule.getID() + "' after " + counter + " attempts.");
             }
         } while (overlap);
         molecules.add(tempMol);
@@ -690,7 +695,7 @@ public class MySystem {
         for (GMolecule gmol1 : gmols) {
             gmol = gmol1;
             for(int j=0;j<gmol.getNumber();j++){
-//                System.out.println("Adding molecule: '" + gmol.getName() + "', instance " + j + " of " + gmol.getNumber());
+                lg.trace("Adding molecule: '" + gmol.getName() + "', instance " + j + " of " + gmol.getNumber());
                 addMolecule(gmol);
             }
         }
@@ -756,8 +761,8 @@ public class MySystem {
 
                     if(i!=0 && i!=npartx+1 && j!=0 && j!=nparty+1 && k!=0 && k!=npartz+1){
                         tempPartition[i][j][k] = new Partition(xs, ys, zs);
-                        //System.out.println("Made partition with x range " + tempPartition[i][j][k].getXString());
-                        //System.out.println("(i,j,k) = (" + i + ", " + j + ", " + k + ")");
+                        //lg.debug("Made partition with x range " + tempPartition[i][j][k].getXString());
+                        lg.trace("Made partition with (i,j,k) = (" + i + ", " + j + ", " + k + ")");
                         partition[i-1][j-1][k-1] = tempPartition[i][j][k];
                     } else {
                         tempPartition[i][j][k] = null;
@@ -1021,10 +1026,12 @@ public class MySystem {
             bond.updateOrientation();
             bond.updateForces();
             if(bond.dissociates()){
-//                Site s0 = bond.getSites()[0];
-//                Site s1 = bond.getSites()[1];
-//                String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
-//                System.out.println("Bond " + bond.getName() + " dissociates: " + who);
+                if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+                    Site s0 = bond.getSites()[0];
+                    Site s1 = bond.getSites()[1];
+                    String who = s0.getType() + ";" + s0.getState().getStateName() + " and " + s1.getType() + ";" + s1.getState().getStateName();
+                    lg.debug("Bond " + bond.getName() + " dissociates: " + who);
+                }
                 reactionCounter.plusDissociationReaction(bond.getName());
                 bondsToRemove.add(bond);
                 Site [] bsite = bond.getSites();
@@ -1070,8 +1077,8 @@ public class MySystem {
 
     public void runSystem() throws IOException {
         // <editor-fold defaultstate="collapsed" desc="Method Code">
-        System.out.println("This stdout file is associated with run counter " + runCounter + ".");
-        System.out.println("Simulation started.");
+        lg.debug("This stdout file is associated with run counter " + runCounter + ".");
+        lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
 
         double nextRealTime = totalTime/100;
@@ -1134,9 +1141,10 @@ public class MySystem {
                         p.println("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
                     } catch (IOException ioe){
                         ioe.printStackTrace(System.out);
+                        lg.warn("Could not write progress update to output file: " + g.getOutputFile(), ioe);
                     }
                 } else {
-                    System.out.println("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
+                    lg.info("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
                 }
 
                 nextRealTime += (totalTime/100.0);
@@ -1157,7 +1165,7 @@ public class MySystem {
         }catch (IOException e){
             e.printStackTrace(System.out);
         }
-        System.out.println("Simulation finished. Writing more data.");
+        lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
         this.writeSiteIDs();
         // Write the data file
@@ -1175,7 +1183,7 @@ public class MySystem {
 
         reactionCounter.writeFullData(dataFolder);
 
-        System.out.println("Finished writing data.");
+        lg.info("Finished writing data.");
         // postprocess data
         // get file extension from inputFile
         String inputFileExtension = inputFile.getName().substring(inputFile.getName().lastIndexOf("."));

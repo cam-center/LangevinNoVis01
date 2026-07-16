@@ -10,29 +10,37 @@ import edu.uchc.cam.langevin.g.counter.GStateCounter;
 
 public class GState {
     
-    private final String name;
-    private final GSiteType type;
+    private final String stateName;
+    private final GSiteType siteType;
     
     private int stateID; // In range 1,000,000,000 to 3,999,999,999
     
     private final GStateCounter stateCounter;
     
-    public GState(GSiteType type, String name){
-        this.name = name;
-        this.type = type;
+    public GState(GSiteType gSiteType, String stateName){
+        this.stateName = stateName;
+        this.siteType = gSiteType;
         stateCounter = new GStateCounter(this);
     }
     
     // GET METHODS
-    public String getName(){
-        return name;
+    public String getStateName(){
+        return stateName;
     }
     
     public String getAbsoluteName(){
         StringBuilder sb = new StringBuilder();
-        sb.append(type.getMoleculeName()).append(" : ");
-        sb.append(type.getName()).append(" : ");
-        sb.append(name);
+        sb.append(siteType.getMoleculeName()).append(" : ");
+        sb.append(siteType.getName()).append(" : ");
+        sb.append(stateName);
+        return sb.toString();
+    }
+    public String getAbsoluteNameBngl(){
+        StringBuilder sb = new StringBuilder();
+        sb.append(siteType.getMoleculeName()).append("(");
+        sb.append(siteType.getName()).append("~");
+        sb.append(stateName);
+        sb.append(")");
         return sb.toString();
     }
     
@@ -44,20 +52,20 @@ public class GState {
         return Integer.toString(stateID);
     }
     
-    public GSiteType getType(){
-        return type;
+    public GSiteType getSiteType(){
+        return siteType;
     }
     
-    public String getTypeName(){
-        return type.getName();
+    public String getSiteTypeName(){
+        return siteType.getName();
     }
     
     public GMolecule getMolecule(){
-        return type.getMolecule();
+        return siteType.getMolecule();
     }
     
     public String getMoleculeName(){
-        return type.getMoleculeName();
+        return siteType.getMoleculeName();
     }
     
     // SET METHODS
@@ -69,7 +77,7 @@ public class GState {
     // Override toString()
     @Override
     public String toString(){
-        return name;
+        return stateName;
     }
     
     public GStateCounter getGStateCounter(){
