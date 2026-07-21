@@ -6,6 +6,8 @@
 
 package edu.uchc.cam.langevin.reaction;
 
+import edu.uchc.cam.langevin.counter.ReactionCounter;
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import edu.uchc.cam.langevin.object.Bond;
 import edu.uchc.cam.langevin.object.Site;
 import edu.uchc.cam.langevin.g.object.GSiteType;
@@ -16,8 +18,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import edu.uchc.cam.langevin.helpernovis.Rand;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class TransitionReactions {
+
+    public static final Logger lg = LogManager.getLogger(TransitionReactions.class);
 
     // Check to see if we even have a reaction. As many states won't have a
     // this check should be faster than calling ArrayList.isEmpty. 
@@ -29,8 +35,10 @@ public class TransitionReactions {
     private final double dt;
     
     private final BindingReactions bindingReactions;
+
+    private ReactionCounter reactionCounter;
     
-    public TransitionReactions(Global g, BindingReactions bindingReactions){
+    public TransitionReactions(Global g, MySystem sys, BindingReactions bindingReactions){
         ArrayList<GTransitionReaction> reactions = g.getTransitionReactions();
         ArrayList<GState> allStates = new ArrayList<>();
         this.dt = g.getdt();
@@ -59,7 +67,10 @@ public class TransitionReactions {
             ArrayList<GTransitionReaction> tempReactions = reactionMap.get(reaction.getInitialState().getID());
             tempReactions.add(reaction);
         }
-        
+    }
+
+    public void setReactionCounter(MySystem sys){
+        this.reactionCounter = sys.getReactionCounter();
     }
     
     public void tryReactions(Site site){
@@ -76,6 +87,7 @@ public class TransitionReactions {
                     // If there is no condition, then just try the reaction
                     case GTransitionReaction.NONE:{
                         if(reactionOccurs(reaction.getRate())){
+                            reactionCounter.plusTransitionReaction(reaction.getName());
                             site.setState(reaction.getFinalState());
                             if(site.isBound()){
                                 updateBondType(site);
@@ -88,6 +100,7 @@ public class TransitionReactions {
                     case GTransitionReaction.FREE:{
                         if(!site.isBound()){
                             if(reactionOccurs(reaction.getRate())){
+                                reactionCounter.plusTransitionReaction(reaction.getName());
                                 site.setState(reaction.getFinalState());
                                 outerbreak = true;
                             }
@@ -101,6 +114,7 @@ public class TransitionReactions {
                                 // See if the reaction can occur regardless of the state of the binding partner
                                 if(reaction.getConditionalState().getID() == GTransitionReaction.ANY_STATE_ID){
                                     if(reactionOccurs(reaction.getRate())){
+                                        reactionCounter.plusTransitionReaction(reaction.getName());
                                         site.setState(reaction.getFinalState());
                                         updateBondType(site);
                                         outerbreak = true;
@@ -109,6 +123,7 @@ public class TransitionReactions {
                                 // If the reaction needs a specific state, look to see if we have it
                                 else if(site.getBindingPartner().getState().getID() == reaction.getConditionalState().getID()){
                                     if(reactionOccurs(reaction.getRate())){
+                                        reactionCounter.plusTransitionReaction(reaction.getName());
                                         site.setState(reaction.getFinalState());
                                         updateBondType(site);
                                         outerbreak = true;
@@ -126,7 +141,7 @@ public class TransitionReactions {
     }
 
     // we changed the state of a site that is part of the bond
-    // there may be another binding reaction for which this complex is now a participant
+    // there may be another binding reaction (dissociation) for which this complex is now a participant
     // if there isn't any, we keep the same bond type (which is a lie, but it is better than using a null reaction name
     // which would crash the counter logic)
     private void updateBondType(Site site){
@@ -140,6 +155,14 @@ public class TransitionReactions {
         Double bondLength = bindingReactions.getBondLength(id, partnerID);
         if (bondLength != null) {
             bond.setBondLength(bondLength);
+        }
+        if (lg.isDebugEnabled()) {
+            Site s0 = bond.getSites()[0];
+            Site s1 = bond.getSites()[1];
+            String who = s0.getType() + ";" + s0.getState().getStateName() +
+                    " and " + s1.getType() + ";" + s1.getState().getStateName();
+            double koff = bindingReactions.getOffProb(id, partnerID);
+            lg.debug("Transition reaction occurred, new bond for " + bond.getName() + " koff: " + koff + " between " + who);
         }
     }
     

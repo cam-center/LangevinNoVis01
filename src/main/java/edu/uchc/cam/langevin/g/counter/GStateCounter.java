@@ -13,10 +13,14 @@ import edu.uchc.cam.langevin.helpernovis.IOHelp;
 import java.io.PrintWriter;
 import java.util.Scanner;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 public class GStateCounter {
-    
+
+    public static final Logger lg = LogManager.getLogger(GStateCounter.class);
+
     private final GState gstate;
     private boolean countTotal;
     private boolean countFree;
@@ -76,7 +80,7 @@ public class GStateCounter {
     }
     
     public String getGStateName(){
-        return gstate.getName();
+        return gstate.getStateName();
     }
     
     public int getGStateID(){
@@ -112,8 +116,8 @@ public class GStateCounter {
     public void writeStateCounter(PrintWriter p){
         StringBuilder sb = new StringBuilder();
         sb.append("'").append(gstate.getMoleculeName()).append("' : '");
-        sb.append(gstate.getTypeName()).append("' : '");
-        sb.append(gstate.getName()).append("'");
+        sb.append(gstate.getSiteTypeName()).append("' : '");
+        sb.append(gstate.getStateName()).append("'");
         sb.append(" : Measure ");
         if(!countBound && !countFree && !countTotal){
             sb.append(NONE).append(" ");

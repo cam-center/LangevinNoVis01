@@ -106,8 +106,8 @@ public class SimulationOptionsTest {
             """;
 
     String expected_idafile_contents_2_lines = """
-            t:r1:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT0__Site1__state0:FREE_MT0__Site1__state0:BOUND_MT0__Site1__state0:TOTAL_MT0__Site1__state1:FREE_MT0__Site1__state1:BOUND_MT0__Site1__state1
-            0.0 0 20 20 0 20 20 0 20 20 0 0 0 0
+            t:r1:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT0__Site1__state0:FREE_MT0__Site1__state0:BOUND_MT0__Site1__state0:TOTAL_MT0__Site1__state1:FREE_MT0__Site1__state1:BOUND_MT0__Site1__state1:CREATION_MT0:DECAY_MT0:BINDING_r1:UNBINDING_r1:TRANSITION_r0
+            0.0 0 20 20 0 20 20 0 20 20 0 0 0 0 0 0 0 0 0
             """;
 
     void deleteDirectory(File directoryToBeDeleted) {

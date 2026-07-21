@@ -88,20 +88,45 @@ public class LangevinPostprocessorTest {
             0.0,0,0,0,0,0,0,
             """;
 
+    private final static String FullReactionData_Content = """
+        Time, BINDING_r0,
+        0.0,0,
+        0.1,0,
+        0.2,0,
+        0.30000000000000004,0,
+        0.4,0,
+        0.5,0,
+        0.6,0,
+        0.7,0,
+        0.7999999999999999,0,
+        0.8999999999999999,0,
+        0.9999999999999999,0,
+        1.0999999999999999,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        0.0,0,
+        """;
+
     private final static String expected_ida_content = """
-            t:r0:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT1:FREE_MT1:BOUND_MT1:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT1__Site0__state0:FREE_MT1__Site0__state0:BOUND_MT1__Site0__state0
-            0.0 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.1 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.2 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.30000000000000004 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.4 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.5 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.6 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.7 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.7999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.8999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0
-            0.9999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0
-            1.0999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0
+            t:r0:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT1:FREE_MT1:BOUND_MT1:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT1__Site0__state0:FREE_MT1__Site0__state0:BOUND_MT1__Site0__state0:BINDING_r0
+            0.0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.2 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.30000000000000004 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.4 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.6 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.7 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.7999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.8999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0.9999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            1.0999999999999999 0 0 0 0 0 0 0 0 0 0 0 0 0 0
             """;
     static Path tempDirectory;
 
@@ -124,6 +149,11 @@ public class LangevinPostprocessorTest {
         try (PrintWriter writer = new PrintWriter(Files.newBufferedWriter(file3.toPath()))) {
             writer.println(FullStateCountData_Content);
         }
+        // write FullReactionData_Content to a file named FullReactionData.csv in tempDirectory
+        File file4 = new File(tempDirectory.toFile().getAbsolutePath(), FULL_REACTION_DATA_CSV);
+        try (PrintWriter writer = new PrintWriter(Files.newBufferedWriter(file4.toPath()))) {
+            writer.println(FullReactionData_Content);
+        }
     }
 
     @AfterAll
@@ -140,7 +170,7 @@ public class LangevinPostprocessorTest {
     @Test
     void test_writeIdaFile() throws IOException {
         File idaFile = new File(tempDirectory.toFile().getAbsolutePath(), "output.ida");
-        writeIdaFile(tempDirectory, idaFile.toPath());
+        LangevinPostprocessor.writeIdaFile(tempDirectory, idaFile.toPath());
 
         String idaFileContent = Files.readString(idaFile.toPath());
         Assertions.assertEquals(normalizeLineEnds(expected_ida_content), normalizeLineEnds(idaFileContent));

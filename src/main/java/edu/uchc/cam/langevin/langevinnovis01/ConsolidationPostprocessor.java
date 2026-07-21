@@ -6,8 +6,12 @@
 
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.counter.ReactionCounter;
 import edu.uchc.cam.langevin.g.object.GMolecule;
+import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
 
@@ -15,6 +19,8 @@ import java.io.*;
 import java.util.*;
 
 public class ConsolidationPostprocessor {
+
+    public static final Logger lg = LogManager.getLogger(ConsolidationPostprocessor.class);
 
     private Global g;
     private final VCellMessaging vcellMessaging;
@@ -66,7 +72,7 @@ public class ConsolidationPostprocessor {
         if (dotIndex > 0) {
             simulationName = simulationName.substring(0, dotIndex);
         } else {
-            System.out.println("Expected an extension for the input file: " + simulationName);
+            throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
         }
     }
 
@@ -158,13 +164,13 @@ public class ConsolidationPostprocessor {
 
                 int runIndex = entry.getKey();
                 LangevinPostprocessor.TimePointClustersInfo clusterInfo = entry.getValue();
-                ClusterStatisticsCalculator.Statistics stats = ClusterStatisticsCalculator.computeIndividualRunStatistics(clusterInfo, totalMolecules);
+                ClusterStatisticsCalculator.Statistics stats = ClusterStatisticsCalculator.computeIndividualRunStatistics(clusterInfo);
                 runStatisticsMap.put(runIndex, stats);
             }
             perTimepointPerRunStatistics.put(currentTimepointValue, runStatisticsMap);
 
             ClusterStatisticsCalculator.Statistics overallStats = ClusterStatisticsCalculator.computeOverallRunStatistics(
-                    allRunsAtTimepoint, totalMolecules);
+                    allRunsAtTimepoint);
             perTimepointOverallRunStatistics.put(currentTimepointValue, overallStats);
 
             ClusterStatisticsCalculator.Statistics meanStats = ClusterStatisticsCalculator.computeMeanRunStatistics(

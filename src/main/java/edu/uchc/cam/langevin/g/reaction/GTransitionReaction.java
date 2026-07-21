@@ -13,9 +13,13 @@ import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-public class GTransitionReaction {
-    
+public class GTransitionReaction implements  GReactionInterface {
+
+    public static final Logger lg = LogManager.getLogger(GTransitionReaction.class);
+
     private String name;
     
     private GMolecule molecule;
@@ -70,7 +74,8 @@ public class GTransitionReaction {
     public void setName(String name){
         this.name = name;
     }
-    
+
+    @Override
     public String getName(){
         return name;
     }
@@ -165,9 +170,9 @@ public class GTransitionReaction {
                 break;
             }
             default:
-                System.out.println("GTransitionReaction.setCondition received unexpected input: " + condition);
+                throw new IllegalArgumentException("GTransitionReaction.setCondition received unexpected input: " + condition);
         }
-        System.out.println("Set condition to " + this.condition + ", with ID " + conditionID);
+        lg.trace("Set condition to " + this.condition + ", with ID " + conditionID);
     }
     
     public void setConditionID(){
@@ -182,7 +187,9 @@ public class GTransitionReaction {
                 conditionID = BOUND;
                 break;
             default:
-                System.out.println("GTransitionReaction.setConditionID received unexpected input: " + condition);
+                throw new IllegalArgumentException(
+                        "GTransitionReaction.setCondition received unexpected input: " + condition
+                );
         }
     }
     
@@ -260,15 +267,15 @@ public class GTransitionReaction {
         if(molecule != null && type != null && initialState != null && finalState != null){
             sb.append("'").append(molecule.getName()).append("' : '");
             sb.append(type.getName()).append("' : '");
-            sb.append(initialState.getName()).append("'");
+            sb.append(initialState.getStateName()).append("'");
             sb.append(" --> ");
-            sb.append("'").append(finalState.getName()).append("' ");
+            sb.append("'").append(finalState.getStateName()).append("' ");
             sb.append(" Rate ").append(Double.toString(rate)).append(" ");
             sb.append(" Condition ").append(condition);
             if(condition.equals(BOUND_CONDITION)){
                 sb.append(" '").append(conditionalMolecule.getName()).append("' : '");
                 sb.append(conditionalType.getName()).append("' : '");
-                sb.append(conditionalState.getName()).append("'");
+                sb.append(conditionalState.getStateName()).append("'");
             }
         }
         return sb.toString();

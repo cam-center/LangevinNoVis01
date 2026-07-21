@@ -17,6 +17,8 @@ import edu.uchc.cam.langevin.object.*;
 import edu.uchc.cam.langevin.reaction.AllostericReactions;
 import edu.uchc.cam.langevin.reaction.BindingReactions;
 import edu.uchc.cam.langevin.reaction.TransitionReactions;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.WorkerEvent;
@@ -33,6 +35,8 @@ import java.util.List;
 import java.util.Random;
 
 public class MySystem {
+
+    public static final Logger lg = LogManager.getLogger(MySystem.class);
 
     public static final String IdaFileExtension = ".ida";
     public static final String ClustersFileExtension = ".json";
@@ -72,6 +76,7 @@ public class MySystem {
     private final boolean countingClusters;
     private final SitePropertyCounter sitePropertyCounter;
     private final LocationTracker locationTracker;
+    private final ReactionCounter reactionCounter;
 
     // To assign molecule ids during creation reactions, it helps to have a
     // global molecule index.
@@ -94,10 +99,10 @@ public class MySystem {
 
     // Temporal system information.
     private final double totalTime;
-    private final double dt;
-    private final double dtspring;
-    private final double dtdata;
-    private final double dtimage;
+    private final double dt;            // simulation time step default 1.0E-8
+    private final double dtspring;      // spring interval default 1.0E-9
+    private final double dtdata;        // data output interval (when we update the counters) default 1.0E-4
+    private final double dtimage;       // image output interval default 1.0E-4
     // Current system time
     private double time = 0;
 
@@ -110,7 +115,7 @@ public class MySystem {
     // 2015-07-12 - Changing code to use a single viewer file. This will
     // dramatically cut down on storage space.
 //    private File viewerFolder;
-    private File viewerFile;
+    private File viewerFile = null;
     private File dataFolder;
 
     // When launching from the front end GUI, I want the system updates to go
@@ -163,7 +168,7 @@ public class MySystem {
      * @param useOutputFile
     \**********************************************************************/
 
-    public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging){
+    public MySystem(Global g, int runCounter, boolean useOutputFile, VCellMessaging vcellMessaging) throws IOException {
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         // if an explicit start random seed was found in the input file, we use it and runCounter
         // // to generate a unique seed for this run, otherwise we just use the current time
@@ -183,7 +188,7 @@ public class MySystem {
             Rand.seedRand(seed);
             rand = new Random(seed);
         }
-        System.out.println("in solver, running: " + runCounter);
+        lg.info("in solver, running: " + runCounter);
 
         this.g = g;
         this.runCounter = runCounter;
@@ -193,9 +198,9 @@ public class MySystem {
         vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"), VCellMessaging.ThrowOnException.NO);
 
         this.decayReactions = g.getDecayReactions();
-        bindingReactions = new BindingReactions(g);
-        transitionReactions = new TransitionReactions(g, bindingReactions);
-        allostericReactions = new AllostericReactions(g, bindingReactions);
+        bindingReactions = new BindingReactions(g, this);
+        transitionReactions = new TransitionReactions(g, this, bindingReactions);
+        allostericReactions = new AllostericReactions(g, this, bindingReactions);
 
         this.moleculeCounter = new MoleculeCounter(g, this);
         this.stateCounter = new StateCounter(g, this);
@@ -204,6 +209,9 @@ public class MySystem {
         this.clusterCounter = new ClusterCounter(g, this);
         this.sitePropertyCounter = new SitePropertyCounter(g,this);
         this.locationTracker = new LocationTracker(g, this);
+        this.reactionCounter = new ReactionCounter(g, this);
+
+        setReactionCounter(this);
 
         // Spatial informartion.
         double xsize = g.getXsize();
@@ -244,6 +252,12 @@ public class MySystem {
         // </editor-fold>
     }
 
+    private void setReactionCounter(MySystem mySystem) {
+        bindingReactions.setReactionCounter(mySystem);
+        transitionReactions.setReactionCounter(mySystem);
+        allostericReactions.setReactionCounter(mySystem);
+    }
+
     // **********************   GET METHODS **************************
 
     public ArrayList<Molecule> getMolecules(){
@@ -270,8 +284,12 @@ public class MySystem {
         return runCounter;
     }
 
+    public ReactionCounter getReactionCounter() {
+        return reactionCounter;
+    }
+
     // *********************  FOLDER MANAGEMENT ************************
-    private void folderSetup(){
+    private void folderSetup() throws IOException {
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         // File information and file setup.
         inputFile = g.getInputFile();
@@ -284,7 +302,8 @@ public class MySystem {
         if (dotIndex > 0) {
             fileName = fileName.substring(0, dotIndex);
         } else {
-            System.out.println("Expected an extension for the input file: " + fileName);
+            // useless to also log error with same info
+            throw new IllegalArgumentException("Input file must have an extension: " + fileName);
         }
 
         /* Check to see if the file is already in a folder named fileName_FOLDER
@@ -304,7 +323,7 @@ public class MySystem {
                 try{
                     Files.copy(inputFile.toPath(), folder.toPath().resolve(inputFile.toPath().getFileName()),StandardCopyOption.REPLACE_EXISTING );
                 } catch(IOException e){
-                    System.out.println("File copy failed in MySystem constructor.");
+                    throw new IOException("Failed to copy input file to working folder", e);
                 }
             }
         }
@@ -316,7 +335,7 @@ public class MySystem {
             } catch(FileAlreadyExistsException fe){
                 // Ignore this exception.
             } catch(IOException e){
-                System.out.println("'images' folder creation failed in MySystem constructor.");
+                lg.warn("'images' folder creation failed in MySystem constructor.");
             }
 
             try{
@@ -324,7 +343,7 @@ public class MySystem {
             } catch(FileAlreadyExistsException fe){
                 // Ignore this exception.
             } catch(IOException e){
-                System.out.println("'videos' folder creation failed in MySystem constructor.");
+                lg.warn("'videos' folder creation failed in MySystem constructor.");
             }
 
             try{
@@ -332,7 +351,7 @@ public class MySystem {
             } catch(FileAlreadyExistsException fe){
                 // Ignore this exception.
             } catch(IOException e){
-                System.out.println("'videos' folder creation failed in MySystem constructor.");
+                lg.warn("'videos' folder creation failed in MySystem constructor.");
             }
         }
 
@@ -343,7 +362,7 @@ public class MySystem {
 //        } catch(FileAlreadyExistsException fe){
 //            viewerFolder = new File(folder.toString() + "/viewer_files/Run" + runCounter);
 //        } catch(IOException e){
-//            System.out.println("'viewer_files' folder creation failed in MySystem constructor.");
+//            lg.info("'viewer_files' folder creation failed in MySystem constructor.");
 //            viewerFolder = null;
 //        }
 
@@ -352,13 +371,15 @@ public class MySystem {
         } catch(FileAlreadyExistsException fe){
             dataFolder = new File(folder.toString() + "/data/Run" + runCounter);
         } catch(IOException e){
-            System.out.println("'data' folder creation failed in MySystem constructor.");
             dataFolder = null;
+            throw new IOException("Failed to create data folder for Run " + runCounter, e);
         }
 
         // Now write the header file
-        viewerFile = new File(folder.toString() + "/viewer_files/", fileName + "_VIEW_Run" + runCounter + ".txt");
-        writeViewerFileHeader();
+        if(runCounter == 0){        // we only save movie for Run0
+            viewerFile = new File(folder.toString() + "/viewer_files/", fileName + "_VIEW_Run" + runCounter + ".txt");
+            writeViewerFileHeader();
+        }
         // </editor-fold>
     }
 
@@ -553,18 +574,17 @@ public class MySystem {
                     if(!site.isBound() && !tempSite.isBound()){
                         GState state1 = site.getState();
                         GState state2 = tempSite.getState();
-                        // System.out.println("(state1, state2) = (" + state1.getName() + ", " + state2.getName() + ")");
                         String key1 = state1.getIdAsString();
                         String key2 = state2.getIdAsString();
+                        lg.trace("--- (state1, state2) = (" + state1.getStateName() + ", " + state2.getStateName() + ")");
+                        lg.trace("(key1, key2) = (" + key1 + ", " + key2 + ")");
 
-                        // System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
-
-                        // System.out.println("(key1, key2) = (" + key1 + ", " + key2 + ")");
                         // Now make sure the sites actually react (if they don't
                         // then this prevents an unnecessary random number generation).
-                        if(bindingReactions.doReact(key1, key2)){
-                            // System.out.println("Looking for reaction.");
+                        if(bindingReactions.doReact(state1, state2)){
+                            lg.trace("Looking for binding reaction.");
                             if(bindingReactions.checkForReaction(key1, key2)){
+                                reactionCounter.plusBindingReaction(bindingReactions.getName(key1, key2));
                                 Bond newBond = new Bond(site, tempSite,
                                         SpringConstant, bindingReactions.getOffProb(key1, key2),
                                         bindingReactions.getName(key1, key2),
@@ -590,10 +610,14 @@ public class MySystem {
                                     }
                                     m1.plusBond();
                                 }
+                                if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+                                    String thisWho = m0.getGName() + "(" + site.getType() + "~" + site.getState().getStateName() + ")";
+                                    String thatWho = m1.getGName() + "(" + tempSite.getType() + "~" + tempSite.getState().getStateName() + ")";
+                                    lg.debug("Binding reaction : " + bindingReactions.getName(key1, key2) + " between " + thisWho + " + " + thatWho);
+                                }
                             }
                         }
                     }
-
                 }
             }
         }
@@ -619,9 +643,8 @@ public class MySystem {
             ArrayList<Site> newSites = tempMol.getSites();
             overlap = siteOverlap(newSites);
             counter++;
-            if(counter > 100000){
-                System.out.println("Could not place the molecule after " + counter + " tries.");
-                break;
+            if (counter > 100000) {
+                throw new IllegalStateException("Failed to place molecule '" + gmolecule.getID() + "' after " + counter + " attempts.");
             }
         } while (overlap);
         molecules.add(tempMol);
@@ -672,7 +695,7 @@ public class MySystem {
         for (GMolecule gmol1 : gmols) {
             gmol = gmol1;
             for(int j=0;j<gmol.getNumber();j++){
-//                System.out.println("Adding molecule: '" + gmol.getName() + "', instance " + j + " of " + gmol.getNumber());
+                lg.trace("Adding molecule: '" + gmol.getName() + "', instance " + j + " of " + gmol.getNumber());
                 addMolecule(gmol);
             }
         }
@@ -738,8 +761,8 @@ public class MySystem {
 
                     if(i!=0 && i!=npartx+1 && j!=0 && j!=nparty+1 && k!=0 && k!=npartz+1){
                         tempPartition[i][j][k] = new Partition(xs, ys, zs);
-                        //System.out.println("Made partition with x range " + tempPartition[i][j][k].getXString());
-                        //System.out.println("(i,j,k) = (" + i + ", " + j + ", " + k + ")");
+                        //lg.debug("Made partition with x range " + tempPartition[i][j][k].getXString());
+                        lg.trace("Made partition with (i,j,k) = (" + i + ", " + j + ", " + k + ")");
                         partition[i-1][j-1][k-1] = tempPartition[i][j][k];
                     } else {
                         tempPartition[i][j][k] = null;
@@ -832,6 +855,7 @@ public class MySystem {
             int reaction = decayReaction.getReaction(freeMolecules.size());
             if(reaction == 1){
                 addMolecule(gmol);
+                reactionCounter.plusCreationReaction(decayReaction.getName());
             } else if(reaction == -1){
                 // If this reaction occurs the number of free molecules must
                 // be greater than zero.
@@ -841,6 +865,7 @@ public class MySystem {
                 molecules.remove(tmol);
                 sites.removeAll(tmol.getSites());
                 links.removeAll(tmol.getLinks());
+                reactionCounter.plusDecayReaction(decayReaction.getName());
             }
         }
         // </editor-fold>
@@ -1001,6 +1026,13 @@ public class MySystem {
             bond.updateOrientation();
             bond.updateForces();
             if(bond.dissociates()){
+                if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+                    Site s0 = bond.getSites()[0];
+                    Site s1 = bond.getSites()[1];
+                    String who = s0.getType() + ";" + s0.getState().getStateName() + " and " + s1.getType() + ";" + s1.getState().getStateName();
+                    lg.debug("Bond " + bond.getName() + " dissociates: " + who);
+                }
+                reactionCounter.plusDissociationReaction(bond.getName());
                 bondsToRemove.add(bond);
                 Site [] bsite = bond.getSites();
                 bsite[0].setBound(false);
@@ -1045,8 +1077,8 @@ public class MySystem {
 
     public void runSystem() throws IOException {
         // <editor-fold defaultstate="collapsed" desc="Method Code">
-        System.out.println("This stdout file is associated with run counter " + runCounter + ".");
-        System.out.println("Simulation started.");
+        lg.debug("This stdout file is associated with run counter " + runCounter + ".");
+        lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
 
         double nextRealTime = totalTime/100;
@@ -1091,6 +1123,8 @@ public class MySystem {
                 sitePropertyCounter.countProperties();
 //                locationTracker.trackPositions();
 
+                reactionCounter.initDatapoint();    // we update in real time as reactions happen
+
                 nextDataTime += dtdata;
             }
             // Look to see if we should output an image
@@ -1105,11 +1139,11 @@ public class MySystem {
                 if(useOutputFile){
                     try(PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), true), true)){
                         p.println("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
-                    } catch (IOException ioe){
-                        ioe.printStackTrace(System.out);
+                    } catch (IOException ioe) {
+                        lg.warn("Could not write progress update to output file: " + g.getOutputFile(), ioe);
                     }
                 } else {
-                    System.out.println("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
+                    lg.info("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
                 }
 
                 nextRealTime += (totalTime/100.0);
@@ -1127,10 +1161,10 @@ public class MySystem {
         stopTime = System.currentTimeMillis();
         try(PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "RunningTime.txt")))){
             pw.println("Running Time: " + IOHelp.formatTime(startTime, stopTime));
-        }catch (IOException e){
-            e.printStackTrace(System.out);
+        } catch (IOException e) {
+            lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
-        System.out.println("Simulation finished. Writing more data.");
+        lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
         this.writeSiteIDs();
         // Write the data file
@@ -1145,7 +1179,10 @@ public class MySystem {
 
         sitePropertyCounter.writeData(dataFolder);
 //        locationTracker.writeData(dataFolder);
-        System.out.println("Finished writing data.");
+
+        reactionCounter.writeFullData(dataFolder);
+
+        lg.info("Finished writing data.");
         // postprocess data
         // get file extension from inputFile
         String inputFileExtension = inputFile.getName().substring(inputFile.getName().lastIndexOf("."));
@@ -1178,6 +1215,9 @@ public class MySystem {
      \**********************************************************************/
 
     private void writeViewerFileHeader(){
+        if (viewerFile == null){
+            return;
+        }
         // <editor-fold defaultstate="collapsed" desc="Method Code">
         try(PrintWriter p = new PrintWriter(new FileWriter(viewerFile), true)) {
             p.print("TotalTime\t" + totalTime + "\n");
@@ -1186,14 +1226,17 @@ public class MySystem {
             p.print("ysize\t" + ymax + "\n");
             p.print("z_outside\t" + (-zmin) + "\n");
             p.print("z_inside\t" + zmax + "\n\n");
-        } catch(IOException e){
-            e.printStackTrace(System.out);
+        } catch (IOException e) {
+            lg.error("Failed to write viewer header: " + viewerFile.getAbsolutePath(), e);
         }
         // </editor-fold>
     }
 
     private void writePositions(){
         // <editor-fold defaultstate="collapsed" desc="Method Code">
+        if(viewerFile == null){
+            return;
+        }
         try(PrintWriter p = new PrintWriter(new FileWriter(viewerFile, true), true)) {
             p.print("SCENE\n");
             p.print("SceneNumber\t" + imageCounter + "\tCurrentTime"
@@ -1214,8 +1257,8 @@ public class MySystem {
                         + b.getSite(1).getID() + "\n");
             }
             p.print("\n");
-        } catch(IOException e){
-            e.printStackTrace(System.out);
+        } catch (IOException e) {
+            lg.error("Failed to write positions in: " + viewerFile.getAbsolutePath(), e);
         }
         imageCounter++;
         // </editor-fold>
@@ -1228,8 +1271,8 @@ public class MySystem {
             for(String idString : moleculeIDs){
                 p.println(idString);
             }
-        }catch(IOException ioe){
-            ioe.printStackTrace(System.out);
+        } catch (IOException ioe) {
+            lg.error("Failed to write MoleculeIDs.csv in folder: " + dataFolder.getAbsolutePath(), ioe);
         }
         // </editor-fold>
     }
@@ -1242,7 +1285,7 @@ public class MySystem {
                 p.println(idString);
             }
         }catch(IOException ioe){
-            ioe.printStackTrace(System.out);
+            lg.error("Failed to write SiteIDs.csv in folder: " + dataFolder.getAbsolutePath(), ioe);
         }
         // </editor-fold>
     }

@@ -1,5 +1,8 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.counter.ReactionCounter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
@@ -17,6 +20,8 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class MySystemTest {
+
+    public static final Logger lg = LogManager.getLogger(MySystemTest.class);
 
     String inputFileContents =
             """
@@ -106,8 +111,8 @@ public class MySystemTest {
             """;
 
     String expected_idafile_contents_2_lines = """
-            t:r1:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT0__Site1__state0:FREE_MT0__Site1__state0:BOUND_MT0__Site1__state0:TOTAL_MT0__Site1__state1:FREE_MT0__Site1__state1:BOUND_MT0__Site1__state1
-            0.0 0 20 20 0 20 20 0 20 20 0 0 0 0
+            t:r1:TOTAL_MT0:FREE_MT0:BOUND_MT0:TOTAL_MT0__Site0__state0:FREE_MT0__Site0__state0:BOUND_MT0__Site0__state0:TOTAL_MT0__Site1__state0:FREE_MT0__Site1__state0:BOUND_MT0__Site1__state0:TOTAL_MT0__Site1__state1:FREE_MT0__Site1__state1:BOUND_MT0__Site1__state1:CREATION_MT0:DECAY_MT0:BINDING_r1:UNBINDING_r1:TRANSITION_r0
+            0.0 0 20 20 0 20 20 0 20 20 0 0 0 0 0 0 0 0 0
             """;
 
     void deleteDirectory(File directoryToBeDeleted) {
@@ -141,7 +146,9 @@ public class MySystemTest {
             Assertions.assertTrue(Files.exists(idaFile));
             String idaFileContents = Files.readString(idaFile);
             Assertions.assertTrue(idaFileContents.startsWith(expected_idafile_contents_2_lines));
-            System.out.println(idaFileContents.substring(0,500)+"\n...\n"+idaFileContents.substring(idaFileContents.length()-500));
+            lg.debug(idaFileContents.substring(0,500)+"\n...\n"+idaFileContents.substring(idaFileContents.length()-500));
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
@@ -167,6 +174,8 @@ public class MySystemTest {
 
             MySystem sys = new MySystem(g, 0, true, vcellMessaging);
             assertNotNull(sys);
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             logFile.delete();
         }
@@ -207,6 +216,8 @@ public class MySystemTest {
             sys.runSystem();
             Assertions.assertTrue(Files.exists(idaFile));
 
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
@@ -214,8 +225,14 @@ public class MySystemTest {
 
     // do not run on github actions, it's somewhat long
     @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * TransitionCondBound.ssld is a file that was used to test a specific bug related to conditional bound transition
+     * where the bond object remains hanging if no reverse rate is to be found, and the simulation would crash with a
+     * null pointer exception when the bond object is being updated. This test is meant to ensure that this bug is fixed
+     * and does not regress in the future, but also to serve as a general test for bond management after transitioning.
+     */
     @Test
-    public void routineDebuggingFromResource() throws IOException {
+    public void transitionConditionBoundFromResource() throws IOException {
         String sim_base_name = "sim";
         int runCounter = 0;
 
@@ -247,9 +264,134 @@ public class MySystemTest {
             sys.runSystem();
             Assertions.assertTrue(Files.exists(idaFile));
 
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
         } finally {
             deleteDirectory(tempDirectory.toFile());
         }
+    }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * BindingWithZeroKf.ssld is a file that was used to test a specific bug related to bimolecular binding
+     * reactions with zero forward rate constant - technically a pure unbinding reaction
+     * in r2, if kon is greater than zero, say 0.001 then the simulation runs fine,
+     * but if kon is set to zero, then the reaction is skipped entirely and unbinding never happens
+     */
+    @Test
+    public void bindingWithZeroKfFromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 0;
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/BindingWithZeroKf.ssld")) {
+            assertNotNull(is, "Resource BindingWithZeroKf.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + ".log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + ".ida");
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            sys.runSystem();
+            Assertions.assertTrue(Files.exists(idaFile));
+
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * AllReactions.ssld is a file that was used to test a combination of all reaction types, including creation,
+     * decay, state transition, allosteric, and bimolecular binding reactions
+     * Also helped in implementation and debugging the reaction counter feature
+     * Good number for quick runs:
+     * MT0 - 4
+     * MT1 - 15
+     * Total time: 0.01
+     */
+    @Test
+    public void allReactionsFromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 0;
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + ".log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + ".ida");
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            sys.runSystem();
+            Assertions.assertTrue(Files.exists(idaFile));
+            sys.getReactionCounter().printCounts();
+            sys.getReactionCounter().printDetailedCounts();
+            System.out.println("done");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // Logger sanity check. Confirms that Log4j2 configuration is found on the classpath,
+    // that the logger instance lg is valid and that the logger is working. This test should always pass.
+    @Test
+    public void loggerTest() {
+
+        Assertions.assertDoesNotThrow(() -> {
+
+            System.out.println("Logger test");
+
+            if(lg.getLevel() == org.apache.logging.log4j.Level.DEBUG) {
+                System.out.println("Logger level is DEBUG");
+            } else {
+                System.out.println("Logger level is " + lg.getLevel());
+            }
+
+            lg.debug("Debug message");
+            lg.info("Info message");
+            lg.error("Error message");
+
+        });         // no exception should be thrown
     }
 
 }

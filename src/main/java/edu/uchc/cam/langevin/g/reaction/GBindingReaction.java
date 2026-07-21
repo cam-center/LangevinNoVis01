@@ -16,8 +16,12 @@ import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-public class GBindingReaction {
+public class GBindingReaction implements GReactionInterface{
+
+    public static final Logger lg = LogManager.getLogger(GBindingReaction.class);
 
     // Might want to name the reactions
     private String name;
@@ -32,6 +36,9 @@ public class GBindingReaction {
     private double koff = 0.0;  // Units s-1.  This is given directly to the bond.
     public double kOffIntrinsic = 0.0;
 
+    // The bond length is the distance between the margins of the two sites when they are bound.
+    // The effective distance between the centers of the two sites when they are bound
+    // is bondLength + type[0].getRadius() + type[1].getRadius()
     private double bondLength = 0.5; // Units nm
 
     public final static String ANY_STATE_STRING = "Any_State";
@@ -73,6 +80,7 @@ public class GBindingReaction {
         this.name = name;
     }
 
+    @Override
     public String getName(){
         return name;
     }
@@ -99,7 +107,7 @@ public class GBindingReaction {
     }
 
     private void setLambda() {
-        System.out.println("BindingReaction: " + name + ", setLambda() called.");
+        lg.trace("BindingReaction: " + name + ", setLambda() called.");
         // conversion when going from concentration‑based kinetics to particle‑based / spatial stochastic kinetics
         // rescale kon from 1/(uM*s) to nm^3/s
         // 1uM = 10^-6 molecules/l, multiply by NA = 6.022e23 molecules/mol to get 6.022e17 molecules/liter
@@ -134,7 +142,7 @@ public class GBindingReaction {
         }
         double volReact = 4.0 * Math.PI * (Math.pow(R,3) - Math.pow(p,3)) / 3.0;    // R=reaction radius, p=site radius
         double kD = 4 * Math.PI * R * D;        // R=reaction radius, D=diffusion rate
-        double kOnIntrinsic = (rescalekon * kD) / (kD - rescalekon);    // may be negative, we take the abs value
+        double kOnIntrinsic = (rescalekon * kD) / (kD - rescalekon);    // may be negative if rescalekon > kD, which is non-physical
         if(kOnIntrinsic < 0.0) {
             double t0r=type[0].getRadius();
             double t1r=type[1].getRadius();
@@ -149,9 +157,15 @@ public class GBindingReaction {
                     + "Kon: " + kon + " uM^-1 s^-1");
         }
         lambdaNew = kOnIntrinsic / volReact;
-        System.out.println("  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
+        lg.trace("  Old Lambda = " + lambdaOld + ", New Lambda = " + lambdaNew);
 
-        kOffIntrinsic = koff * kOnIntrinsic / rescalekon;
+        // if kon is 0 (pure dissociation), then the normal formula for kOffIntrinsic will give NaN
+        // because we divide by rescalekon == 0.  In that case, we just set kOffIntrinsic = koff.
+        if(kon == 0.0) {
+            kOffIntrinsic = koff;
+        } else {
+            kOffIntrinsic = koff * kOnIntrinsic / rescalekon;
+        }
     }
 
     public double getBondLength(){
@@ -264,11 +278,6 @@ public class GBindingReaction {
 
         // MUST SET LAMBDA HERE.  I FORGOT TO DO THIS AT FIRST!
         setLambda();
-//        // If lambda*dt is too big give a warning.
-//        if(lambdaOld*g.getdt() > 0.05){
-//            System.out.println("WARNING: lambda*dt = " + lambdaOld*g.getdt() + "."
-//                    + " For accurate results you want lambda*dt << 0.01.");
-//        }
         // </editor-fold>
     }
 

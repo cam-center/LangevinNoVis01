@@ -1,11 +1,15 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.vcell.data.LangevinPostprocessor;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class ClusterStatisticsCalculator {
+
+    public static final Logger lg = LogManager.getLogger(ClusterStatisticsCalculator.class);
 
     public static class Statistics {
         double averageClusterSize;
@@ -30,130 +34,221 @@ public class ClusterStatisticsCalculator {
         }
     }
 
+
+    // new version
     public static ClusterStatisticsCalculator.Statistics computeIndividualRunStatistics(
-            LangevinPostprocessor.TimePointClustersInfo clusterInfo, int totalMolecules) {
+            LangevinPostprocessor.TimePointClustersInfo clusterInfo) {
 
         ClusterStatisticsCalculator.Statistics stats = new ClusterStatisticsCalculator.Statistics();
 
-        int totalClusters = clusterInfo.timePointTotalClusters;
-        int totalNonTrivialMolecules = clusterInfo.timePointClusterInfoList.stream()
-                .mapToInt(cluster -> cluster.size)
-                .sum();
-        int trivialClusters = totalMolecules - totalNonTrivialMolecules; // derived from missing molecules
+        Map<Integer, Double> csf = stats.clusterSizeFrequencyMap;   // size → count
 
-        List<Integer> clusterSizes = clusterInfo.timePointClusterInfoList.stream()
-                .map(cluster -> cluster.size)
-                .collect(Collectors.toList());
+        int totalClustersThisRun = clusterInfo.getTimePointTotalClusters();   // includes size 1+
+        List<LangevinPostprocessor.ClusterInfo> nonTrivial = clusterInfo.getTimePointClusterInfoList();
 
-        // CSF frequency distribution for cluster sizes
-        // is there a preferred cluster size? are small clusters transitioning into large ones?
-        clusterSizes.forEach(size -> stats.clusterSizeFrequencyMap.merge(size, 1.0, Double::sum));
+        int nonTrivialClustersCount = 0;
+        int moleculesInNonTrivialClusters = 0;
 
-        // normalize CSF
-        stats.normalizedClusterSizeFrequencyMap = stats.clusterSizeFrequencyMap.entrySet().stream()
-                .collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue() / totalClusters));
+        // Count non-trivial clusters (size >= 2)
+        for (LangevinPostprocessor.ClusterInfo ci : nonTrivial) {
+            int size = ci.getSize();
+            if (size < 2) continue;
 
-        // FF (including trivial clusters)
-        Map<Integer, Long> sizeCounts = clusterSizes.stream()
-                .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+            nonTrivialClustersCount++;
+            moleculesInNonTrivialClusters += size;
 
-        sizeCounts.put(1, (long) trivialClusters); // explicitly adding trivial clusters
+            csf.merge(size, 1.0, Double::sum);
+        }
 
-        stats.fractionalFrequency = sizeCounts.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> (double) e.getValue() / (double) totalClusters));
+        // Count trivial clusters (size == 1)
+        int trivialClustersCount = totalClustersThisRun - nonTrivialClustersCount;
+        if (trivialClustersCount > 0) {
+            csf.merge(1, (double) trivialClustersCount, Double::sum);
+        }
+        double totalMoleculesThisRun = moleculesInNonTrivialClusters + trivialClustersCount;    // Total molecules for this run
 
-        // ACS
-        stats.averageClusterSize = totalMolecules / (double) totalClusters;
+        // ClusterSizeFrequencyMap
+        stats.clusterSizeFrequencyMap =                             // sort by cluster size (key)
+                csf.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey,
+                                Map.Entry::getValue,
+                                (a, b) -> a,
+                                LinkedHashMap::new
+                        ));
 
-        // FOTM
-        stats.fractionOfTotalMolecules = sizeCounts.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey,
-                        e -> (e.getKey() * e.getValue()) / (double) totalMolecules));
+        // NormalizedClusterSizeFrequencyMap (per-run)
+       stats.normalizedClusterSizeFrequencyMap.clear();
+        for (Map.Entry<Integer, Double> e : stats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            stats.normalizedClusterSizeFrequencyMap.put(size, count / totalClustersThisRun);
+        }
 
-        // ACO
-        stats.averageClusterOccupancy = stats.fractionOfTotalMolecules.entrySet().stream()
-                .mapToDouble(e -> e.getKey() * e.getValue())
-                .sum();
+        // Fractional Frequency (FF)
+        stats.fractionalFrequency.clear();
+        for (Map.Entry<Integer, Double> e : stats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            stats.fractionalFrequency.put(size, count / totalClustersThisRun);
+        }
 
-        // SD
+        // Average Cluster Size (ACS)
+        stats.averageClusterSize = totalMoleculesThisRun / totalClustersThisRun;
+
+        // Fraction of Total Molecules (FOTM)
+        stats.fractionOfTotalMolecules.clear();
+        for (Map.Entry<Integer, Double> e : stats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            stats.fractionOfTotalMolecules.put(size, (size * count) / totalMoleculesThisRun);
+        }
+
+        // Average Cluster Occupancy (ACO)
+        double aco = 0.0;
+        for (Map.Entry<Integer, Double> e : stats.fractionOfTotalMolecules.entrySet()) {
+            int size = e.getKey();
+            double fraction = e.getValue();
+            aco += size * fraction;
+        }
+        stats.averageClusterOccupancy = aco;
+
+        // Standard Deviation (SD)
         double mean = stats.averageClusterSize;
-        double variance = sizeCounts.entrySet().stream()
-                .mapToDouble(e -> e.getValue() * Math.pow(e.getKey() - mean, 2))
-                .sum() / (double) totalClusters;
+        double variance = 0.0;
+        for (Map.Entry<Integer, Double> e : stats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            variance += count * Math.pow(size - mean, 2);
+        }
+        variance /= totalClustersThisRun;
         stats.standardDeviation = Math.sqrt(variance);
 
         return stats;
     }
 
+    // we calculate agregate statistics for all runs at this timepoint
     public static ClusterStatisticsCalculator.Statistics computeOverallRunStatistics(
-            Map<Integer, LangevinPostprocessor.TimePointClustersInfo> allRunsAtTimepoint, int totalMoleculesPerRun) {
+            Map<Integer, LangevinPostprocessor.TimePointClustersInfo> allRunsAtTimepoint) {
 
-        int numRuns = allRunsAtTimepoint.size();
         ClusterStatisticsCalculator.Statistics overallStats = new ClusterStatisticsCalculator.Statistics();
 
-        List<Integer> aggregatedClusterSizes = new ArrayList<>();
-        int totalNonTrivialMolecules = 0;
+        Map<Integer, Double> csf = overallStats.clusterSizeFrequencyMap; // size → count
 
-        // merge data from all Runs at this timepoint
-        int totalClusters = allRunsAtTimepoint.values().stream()
-                .mapToInt(clusterInfo -> clusterInfo.timePointTotalClusters)
-                .sum();
+        double totalMoleculesAllRuns = 0.0;     // sum of molecules across all runs
+        double totalClustersAllRuns = 0.0;      // sum of clusters across all runs
+        int numberOfRuns = allRunsAtTimepoint.size();
 
-        for (LangevinPostprocessor.TimePointClustersInfo clusterInfo : allRunsAtTimepoint.values()) {
-            int nonTrivialMolecules = clusterInfo.timePointClusterInfoList.stream()
-                    .mapToInt(cluster -> cluster.size)
-                    .sum();
-            totalNonTrivialMolecules += nonTrivialMolecules;
-
-            clusterInfo.timePointClusterInfoList.stream()
-                    .map(cluster -> cluster.size)
-                    .forEach(aggregatedClusterSizes::add);
+        int nonTrivialPerTimepoint = 0;
+        for (LangevinPostprocessor.TimePointClustersInfo tpInfo : allRunsAtTimepoint.values()) {
+            nonTrivialPerTimepoint += tpInfo.getTimePointClusterInfoList().size();
         }
 
-        // raw CSF aggregate frequency distribution for cluster sizes
-        for (Integer size : aggregatedClusterSizes) {
-            overallStats.clusterSizeFrequencyMap.merge(size, 1.0, Double::sum);
+        // Aggregate cluster counts and molecule counts across runs
+        for (LangevinPostprocessor.TimePointClustersInfo tpInfo : allRunsAtTimepoint.values()) {
+
+            int totalClustersThisRun = tpInfo.getTimePointTotalClusters();              // includes size 1+
+            totalClustersAllRuns += totalClustersThisRun;
+            List<LangevinPostprocessor.ClusterInfo> nonTrivial = tpInfo.getTimePointClusterInfoList(); // size >= 2
+
+            // Count non-trivial clusters (size >= 2) for this run
+            int nonTrivialClustersCount = 0;
+            int moleculesInNonTrivialClusters = 0;
+
+            for (LangevinPostprocessor.ClusterInfo ci : nonTrivial) {
+                int size = ci.getSize();
+                if (size < 2) continue;
+
+                nonTrivialClustersCount++;
+                moleculesInNonTrivialClusters += size;
+
+                csf.merge(size, 1.0, Double::sum); // add one cluster of this size
+            }
+
+            // Count trivial clusters (size == 1)
+            int trivialClustersCount = totalClustersThisRun - nonTrivialClustersCount;
+            if (trivialClustersCount > 0) {
+                csf.merge(1, (double) trivialClustersCount, Double::sum);
+            }
+
+            int totalMoleculesThisRun = moleculesInNonTrivialClusters + trivialClustersCount;   // total molecules for this run at this timepoint
+            totalMoleculesAllRuns += totalMoleculesThisRun;     // accumulate across all runs at this timepoint
         }
-        // normalize CSF
-        overallStats.normalizedClusterSizeFrequencyMap = overallStats.clusterSizeFrequencyMap.entrySet().stream()
-                .collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue() / totalClusters));
 
-        int totalMoleculesAcrossRuns = totalMoleculesPerRun * numRuns;
-        int trivialClusters = Math.max(0, totalMoleculesAcrossRuns - totalNonTrivialMolecules);
+        overallStats.clusterSizeFrequencyMap =              // sort by cluster size (key)
+                csf.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey,
+                                Map.Entry::getValue,
+                                (a, b) -> a,
+                                LinkedHashMap::new
+                        ));
 
-        // FF (fractional frequency - including trivial clusters)
-        Map<Integer, Long> sizeCounts = aggregatedClusterSizes.stream()
-                .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+        // Compute normalizedClusterSizeFrequencyMap
+        overallStats.normalizedClusterSizeFrequencyMap.clear();
+        for (Map.Entry<Integer, Double> e : overallStats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            overallStats.normalizedClusterSizeFrequencyMap.put(size, count / totalClustersAllRuns);
+        }
 
-        sizeCounts.put(1, (long) trivialClusters); // explicitly adding trivial clusters
+        // Fractional Frequency (FF) — including trivial clusters
+        overallStats.fractionalFrequency.clear();
 
-        final int finalTotalClusters = totalClusters; // lambda expression needs effectively final variable
-        overallStats.fractionalFrequency = sizeCounts.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> (double) e.getValue() / finalTotalClusters));
+        for (Map.Entry<Integer, Double> e : overallStats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            overallStats.fractionalFrequency.put(size, count / totalClustersAllRuns);
+        }
 
-        // ACS (Average Cluster Size)
-        overallStats.averageClusterSize = totalMoleculesAcrossRuns / (double) finalTotalClusters;
+        // Average Cluster Size (ACS)
+        overallStats.averageClusterSize = totalMoleculesAllRuns / totalClustersAllRuns;
 
-        // FOTM (Fraction of Total Molecules)
-        overallStats.fractionOfTotalMolecules = sizeCounts.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey,
-                        e -> (e.getKey() * e.getValue()) / (double) totalMoleculesAcrossRuns));
+        // Fraction of Total Molecules (FOTM)
+        overallStats.fractionOfTotalMolecules.clear();
 
-        // ACO (Average Cluster Occupancy)
-        overallStats.averageClusterOccupancy = overallStats.fractionOfTotalMolecules.entrySet().stream()
-                .mapToDouble(e -> e.getKey() * e.getValue())
-                .sum();
+        for (Map.Entry<Integer, Double> e : overallStats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            double moleculesOfThisSize = size * count;
+            overallStats.fractionOfTotalMolecules.put(size, moleculesOfThisSize / totalMoleculesAllRuns);
+        }
 
-        // SD (Standard Deviation)
+        // Average Cluster Occupancy (ACO)
+        double aco = 0.0;
+        for (Map.Entry<Integer, Double> e : overallStats.fractionOfTotalMolecules.entrySet()) {
+            int size = e.getKey();
+            double fraction = e.getValue();
+            aco += size * fraction;
+        }
+        overallStats.averageClusterOccupancy = aco;
+
+        // Standard Deviation (SD)
         double mean = overallStats.averageClusterSize;
-        double variance = sizeCounts.entrySet().stream()
-                .mapToDouble(e -> e.getValue() * Math.pow(e.getKey() - mean, 2))
-                .sum() / (double) finalTotalClusters;
+        double variance = 0.0;
+
+        for (Map.Entry<Integer, Double> e : overallStats.clusterSizeFrequencyMap.entrySet()) {
+            int size = e.getKey();
+            double count = e.getValue();
+            variance += count * Math.pow(size - mean, 2);
+        }
+
+        variance /= totalClustersAllRuns;
         overallStats.standardDeviation = Math.sqrt(variance);
 
         return overallStats;
     }
 
+    // Here we do NOT compute fractionalFrequency (FF) or fractionOfTotalMolecules (FOTM)
+    // FF and FOTM are per-run ratios whose denominators vary from run to run:
+    //    FF(size)  = count(size) / totalClustersThisRun
+    //    FOTM(size) = (size * count(size)) / totalMoleculesThisRun
+    // Because totalClustersThisRun and totalMoleculesThisRun differ across runs (due to creation/decay reactions),
+    // FF and FOTM cannot be averaged meaningfully.
+    // Averaging ratios with different denominators produces values that do not correspond to any real cluster or molecule distribution.
+    // Therefore, mean-run statistics only average quantities that are additive or scalar per run (ACS, ACO, SD, and CSF).
     public static ClusterStatisticsCalculator.Statistics computeMeanRunStatistics(
             Map<Integer, ClusterStatisticsCalculator.Statistics> runStatisticsMap, int numRuns) {
 
@@ -177,6 +272,16 @@ public class ClusterStatisticsCalculator {
         meanStats.averageClusterOccupancy = sumACO / numRuns;
         meanStats.clusterSizeFrequencyMap = aggregatedFrequency.entrySet().stream()     // raw CSF
                 .collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue() / numRuns));
+        meanStats.clusterSizeFrequencyMap =
+                aggregatedFrequency.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey,
+                                e -> e.getValue() / numRuns,
+                                (a,b)->a,
+                                LinkedHashMap::new
+                        ));
+
         // normalize CSF
         double totalClustersAcrossRuns = meanStats.clusterSizeFrequencyMap.values().stream()
                 .mapToDouble(Double::doubleValue)
@@ -193,15 +298,10 @@ public class ClusterStatisticsCalculator {
         return meanStats;
     }
 
-    // TODO: for the future: keep counts with how many time each reaction was triggered for each timepoint
-    //  (it's the FREE in the peimary statistics)
-
-    // we ignore trivial clusters, we'll have that info elsewhere with separate counts per each molecule
-    // to detect depletion
     public static void fillEmptyClusterFrequencies(Map<?, ClusterStatisticsCalculator.Statistics> allStats, int maxClusterSize) {
         // ensure all frequency maps include every cluster size up to maxClusterSize
         for (ClusterStatisticsCalculator.Statistics stats : allStats.values()) {
-            for (int size = 2; size <= maxClusterSize; size++) {
+            for (int size = 1; size <= maxClusterSize; size++) {
                 stats.clusterSizeFrequencyMap.putIfAbsent(size, 0.0);           // fill missing sizes with 0
                 stats.normalizedClusterSizeFrequencyMap.putIfAbsent(size, 0.0);
             }

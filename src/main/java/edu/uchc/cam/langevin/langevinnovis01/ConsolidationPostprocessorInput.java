@@ -2,13 +2,18 @@ package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 
 public class ConsolidationPostprocessorInput {
+
+    public static final Logger lg = LogManager.getLogger(ConsolidationPostprocessorInput.class);
 
     private Map<String, File> nameToIdaFileMap;
     private Map<Integer, SolverResultSet> solverResultSetMap;
@@ -34,22 +39,20 @@ public class ConsolidationPostprocessorInput {
         if(nameToIdaFileMap.size() != cp.getNumRuns()) {
             throw new RuntimeException("Expected ida file map size " + cp.getNumRuns() + " but found " + nameToIdaFileMap.size());
         }
-//        nameToIdaFileMap.forEach((name, file) -> System.out.println(name + " -> " + file.getAbsolutePath()));    // show results
+        nameToIdaFileMap.forEach((name, file) -> lg.debug(name + " -> " + file.getAbsolutePath())
+        );
 
 
         // read the name to Ida file map, use it to make the solver result set map
         //   key = run index (first index is 0)
         //   value = solver result set for the run with that index
         solverResultSetMap = FileMapper.filesToSolverResultSetMap(cp.getSimulationName(), nameToIdaFileMap);
-//        solverResultSetMap.forEach((key, resultSet) -> {      // show results
-//            System.out.println("Key: " + key);
-//            System.out.println("Columns: " + resultSet.getColumnDescriptions());
-//            System.out.println("Data:");
-//            resultSet.getValues().forEach(row -> System.out.println(Arrays.toString(row)));
-//        });
-
-
-
+        solverResultSetMap.forEach((key, resultSet) -> {
+            lg.debug("Key: " + key);
+            lg.debug("Columns: " + resultSet.getColumnDescriptions());
+            lg.debug("Data:");
+            resultSet.getValues().forEach(row -> lg.debug(Arrays.toString(row)));
+        });
     }
 }
 

@@ -9,9 +9,13 @@ import edu.uchc.cam.langevin.g.object.GSite;
 import edu.uchc.cam.langevin.g.object.GSiteType;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-public class GAllostericReaction {
-    
+public class GAllostericReaction implements GReactionInterface {
+
+    public static final Logger lg = LogManager.getLogger(GAllostericReaction.class);
+
     private String name;
     
     private GMolecule molecule;
@@ -42,7 +46,8 @@ public class GAllostericReaction {
     public void setName(String name){
         this.name = name;
     }
-    
+
+    @Override
     public String getName(){
         return name;
     }
@@ -127,12 +132,12 @@ public class GAllostericReaction {
         if(molecule != null && site != null && initialState != null && finalState != null){
             sb.append("'").append(molecule.getName()).append("' : ");
             sb.append("Site ").append(site.getIndex()).append(" : '");
-            sb.append(initialState.getName()).append("'");
+            sb.append(initialState.getStateName()).append("'");
             sb.append(" --> ");
-            sb.append("'").append(finalState.getName()).append("' ");
+            sb.append("'").append(finalState.getStateName()).append("' ");
             sb.append(" Rate ").append(Double.toString(rate));
             sb.append(" Allosteric_Site ").append(allostericSite.getIndex());
-            sb.append(" State '").append(allostericState.getName()).append("'");
+            sb.append(" State '").append(allostericState.getStateName()).append("'");
         }
         return sb.toString();
         // </editor-fold>

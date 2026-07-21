@@ -6,8 +6,12 @@
  */
 package edu.uchc.cam.langevin.helpernovis;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 public class OnRateSolver {
 
+    public static final Logger lg = LogManager.getLogger(OnRateSolver.class);
     /*
      *                Irreversible Reaction
      * The function f gives the macroscopic on rate in terms of the physical 
@@ -105,7 +109,9 @@ public class OnRateSolver {
      * 
      * 
      */
-    
+    // This is the old version of the method, which is not used anymore.  It is kept here for reference.
+    // We are now using Boris's method which is better.
+    @Deprecated
     public static double getrootIrreversible(double p, double R, double D, double kon){
         // <editor-fold defaultstate="collapsed" desc="Method Code">  
         // Make a guess for r_left, and then adjust it so that f(r_left)-kon>0.
@@ -160,8 +166,12 @@ public class OnRateSolver {
             }
             
             count++;
-            if(count > 10000000){
-                System.out.println("Took over 10,000,000 iterations to try to find a root using OnRateSolver.getroot().");
+            if(count > 10000000) {
+                // we don't throw because the lambda computed this way is not used. We just want to discover what
+                // would have gone wrong (and why) if we had used this method.
+                // The new method is more robust and is being used instead.
+                lg.debug("getrootIrreversible: finding a root using OnRateSolver.getroot() failed to converge.");
+                lg.debug("   p: " + p + ",  R: " + R + ",  D: " + D + ",  kon: " + kon + ",  g_min: " + g_min);
                 break;
             }
         }
@@ -169,7 +179,8 @@ public class OnRateSolver {
         return D/(r_min*r_min);
         // </editor-fold>
     }
-    
+
+    @Deprecated
     public static double getrootReversible(double p, double a, double R, double D, double kon){
         // <editor-fold defaultstate="collapsed" desc="Method Code">  
         // Make a guess for r_left, and then adjust it so that g(r_left)-kon>0.
@@ -226,7 +237,11 @@ public class OnRateSolver {
             count++;
             
             if(count > 10000000){
-                System.out.println("Took over 10,000,000 iterations to try to find a root using OnRateSolver.getroot().");
+                // we don't throw because the lambda computed this way is not used. We just want to discover what
+                // would have gone wrong (and why) if we had used this method.
+                // The new method is more robust and is being used instead.
+                lg.debug("getrootReversible: finding a root using OnRateSolver.getroot() failed to converge.");
+                lg.debug("  p: " + p + ",  a: " + a + ",  R: " + R + ",  D: " + D + ",  kon: " + kon  + ",  g_min: " + g_min);
                 break;
             }
         }
@@ -262,8 +277,11 @@ public class OnRateSolver {
      * This method will take in p and R in nanometers, D in um^2/s, kon in
      * uM-1.s-1, and dt in seconds, and will check the status of each of these
      * inequalities.  We'll also need the particle number and system volume.
+     *
+     * Used only in @Tests
+     * TODO: to make this really useful we should also test validity of lambda calculated the new way (Boris)
+     *  TODO: we should move this to the client and raise issues if the inequalities are not satisfied.
      */
-    
     public static void checkInequalities(double p, double R, double D, double kon, double dt){
         // <editor-fold defaultstate="collapsed" desc="Method Code">  
         double kon_scale = 1660000.0 * kon;
@@ -273,51 +291,33 @@ public class OnRateSolver {
         
         boolean check1 = (kon_scale < rhs1);
         
-        System.out.println("kon = " + kon_scale + ", 4*pi*R*D = " + rhs1 + "; kon < 4*pi*R*D is " + check1);
+        lg.info("kon = " + kon_scale + ", 4*pi*R*D = " + rhs1 + "; kon < 4*pi*R*D is " + check1);
         
         if(!check1){
-            System.out.println("Not going to bother with other checks.");
-            System.out.println();
+            lg.info("Not going to bother with other checks.");
+            lg.info("");
         } else{
-            System.out.println();
+            lg.info("");
             double rms = Math.sqrt(2*D_scale*dt);
-            System.out.print("rms = " + rms + ". ");
+            lg.info("rms = " + rms + ". ");
             double rhs2;
             if(R-p < p){
                 rhs2 = R-p;
-                System.out.print("Smallest distance scale is R-p = " + rhs2 + ". ");
+                lg.info("Smallest distance scale is R-p = " + rhs2 + ". ");
             } else {
                 rhs2 = p;
-                System.out.print("Smallest distance scale is p = " + rhs2 + ". ");
+                lg.info("Smallest distance scale is p = " + rhs2 + ". ");
             }
             boolean check2 = (rms < rhs2);
-            System.out.println("rms < dist_min is " + check2 + ".  Ratio:" + rms/rhs2);
-            System.out.println();
+            lg.info("rms < dist_min is " + check2 + ".  Ratio:" + rms/rhs2);
+            lg.info("");
             double lambda = getrootIrreversible(p,R,D_scale,kon_scale);
-            System.out.println("lambda = " + lambda + ". lambda*dt = " + lambda*dt);
+            lg.info("lambda = " + lambda + ". lambda*dt = " + lambda*dt);
         }
-        System.out.println();
-        System.out.println("***********");
-        System.out.println();
+        lg.info("");
+        lg.info("***********");
+        lg.info("");
         // </editor-fold>
     }
             
-    
-    public static void main(String [] args){
-        
-        //double lambda = OnRateSolver.getrootIrreversible(5, 10, 0.08*1000000.0, 5*1660000.0);
-        //System.out.println(lambda);
-        // checkInequalities(4,6,20,5,Math.pow(10,-9));
-        // checkInequalities(4,6,20,5,Math.pow(10,-9));
-        //checkInequalities(2,2.2,2,5,2*Math.pow(10,-9));
-        
-//        for(int i=0;i<10;i++){
-//            System.out.println(g(0.5,0.6+i,5,1,0.005));
-//        }
-        
-        // double lambda = OnRateSolver.getrootReversible(0.2, 1.2, 1.2, 20.0*1000000.0, 1000*1660000.0);
-        double lambda = OnRateSolver.getrootReversible(0.2, 1.2, 1.2, 20.0*1000000.0, 1000*1660000.0);
-        System.out.println(lambda);
-        
-    }
 }
