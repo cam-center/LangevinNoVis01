@@ -1,11 +1,17 @@
 package edu.uchc.cam.langevin.helpernovis;
 
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SolverResultSet {
+
+    public static final Logger lg = LogManager.getLogger(SolverResultSet.class);
 
     public static final String TIME = "t";
     public static final String TIME_COLUMN = TIME;

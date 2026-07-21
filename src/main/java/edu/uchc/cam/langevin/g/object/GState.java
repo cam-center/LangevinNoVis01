@@ -7,9 +7,14 @@
 package edu.uchc.cam.langevin.g.object;
 
 import edu.uchc.cam.langevin.g.counter.GStateCounter;
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GState {
-    
+
+    public static final Logger lg = LogManager.getLogger(GState.class);
+
     private final String stateName;
     private final GSiteType siteType;
     

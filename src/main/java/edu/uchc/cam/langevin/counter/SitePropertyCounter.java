@@ -17,8 +17,12 @@ import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import edu.uchc.cam.langevin.object.Site;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class SitePropertyCounter {
+
+    public static final Logger lg = LogManager.getLogger(SitePropertyCounter.class);
 
     private final MySystem sys;
     
@@ -167,9 +171,8 @@ public class SitePropertyCounter {
                     p.println();
                 }
             }
-        } catch(IOException ioe){
-            System.out.println(ioe.getMessage());
-            ioe.printStackTrace(System.out);
+        } catch (IOException ioe) {
+            throw new IllegalStateException("Failed to write SitePropertyData.csv to path: " + path, ioe);
         }
     }
     

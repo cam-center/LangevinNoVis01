@@ -2,6 +2,8 @@ package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.helpernovis.ColumnDescription;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -10,6 +12,8 @@ import java.util.List;
 
 
 public class ConsolidationPostprocessorOutput {
+
+    public static final Logger lg = LogManager.getLogger(ConsolidationPostprocessorOutput.class);
 
     private File simulationFolder;
     private String simulationName;

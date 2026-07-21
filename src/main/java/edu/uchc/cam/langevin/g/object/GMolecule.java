@@ -7,6 +7,7 @@
 package edu.uchc.cam.langevin.g.object;
 
 import edu.uchc.cam.langevin.g.counter.GMoleculeCounter;
+import edu.uchc.cam.langevin.g.counter.GStateCounter;
 import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
 
 import java.util.ArrayList;
@@ -21,8 +22,12 @@ import edu.uchc.cam.langevin.object.Link;
 import edu.uchc.cam.langevin.object.Molecule;
 import edu.uchc.cam.langevin.langevinnovis01.MyVector;
 import edu.uchc.cam.langevin.object.Site;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GMolecule {
+
+    public static final Logger lg = LogManager.getLogger(GMolecule.class);
     /* Example:
                 MOLECULE: "MT0" Intracellular Number 20 Site_Types 2 Total_Sites 3 Total_Links 2 is2D false
 
@@ -143,8 +148,9 @@ public class GMolecule {
                 break;
             }
         }
-        if(tempType == null){
-            System.out.println("Invalid typeName supplied to molecule.getType().");
+        if (tempType == null) {
+            throw new IllegalStateException("GMolecule.getType() failed: no type found for typeName = " +
+                            (typeName == null ? "null" : "'" + typeName + "'"));
         }
         return tempType;
     }
@@ -259,7 +265,7 @@ public class GMolecule {
         }
         for(int i=0;i<siteArray.size();i++){
             GSite gsite = siteArray.get(i);
-            // System.out.println("In gmolecule newInstance(): gsite initial state is " + gsite.getInitialState() + " with id " + gsite.getInitialState().getIdAsString());
+            // lg.info("In gmolecule newInstance(): gsite initial state is " + gsite.getInitialState() + " with id " + gsite.getInitialState().getIdAsString());
             // The site id will be the molecule id appended with three digits
             // THIS LIMITS MOLECULES TO NO MORE THAN 1000 SITES, WHICH IS 
             // SUFFICIENT FOR THE FORESEEABLE FUTURE.
@@ -331,15 +337,16 @@ public class GMolecule {
             line.add(checkLine);
             checkLine = sc.nextLine();
         }
-//        for(int i=0;i<line.size();i++){
-//            System.out.println("Line " + i + ": " + line.get(i));
-//        }
+        for(int i=0;i<line.size();i++){
+            lg.trace("Line " + i + ": " + line.get(i));
+        }
         
         Scanner sc0 = new Scanner(line.get(0)); 
         // check input line
-//        if(!sc0.next().equals("MOLECULE:")){
-//            System.out.println("ERROR: Molecule scanner does not begin with \"MOLECULE:\"");
-//        }
+        if(!sc0.next().equals("MOLECULE:")){
+            // we'll throw some exception eventually but for now we want to log as much as possible of what went wrong
+            lg.error("ERROR: Molecule scanner does not begin with \"MOLECULE:\"");
+        }
         
         tempMol.setName(IOHelp.getNameInQuotes(sc0));
         tempMol.setLocation(sc0.next());
@@ -348,35 +355,35 @@ public class GMolecule {
         if(sc0.next().equals("Number")){
             tempMol.setNumber(sc0.nextInt());
         } else {
-            System.out.println("Could not read the total number of molecules.");
+            lg.error("Could not read the total number of molecules.");
         }
         // Now get the total types, sites, and links
         int totalTypes = -1;
         if(sc0.next().equals("Site_Types")){
             totalTypes = sc0.nextInt();
         } else {
-            System.out.println("Could not read total types.");
+            lg.error("Could not read total types.");
         }
         int totalSites = -1;
         if(sc0.next().equals("Total_Sites")){
             totalSites = sc0.nextInt();
         } else {
-            System.out.println("Could not read number of total sites.");
+            lg.error("Could not read number of total sites.");
         }
         int totalLinks = -1;
         if(sc0.next().equals("Total_Links")){
             totalLinks = sc0.nextInt();
         } else {
-            System.out.println("Could not read total number of links.");
+            lg.error("Could not read total number of links.");
         }
         if(sc0.next().equals("is2D")){
             tempMol.set2D(sc0.nextBoolean());
         } else {
-            System.out.println("Could not read is2D flag.");
+            lg.error("Could not read is2D flag.");
         }
         // check input file one last time
         if(!line.get(1).equals("{")){
-            System.out.println("ERROR: Molecule scanner did not find opening \"{\"");
+            lg.error("ERROR: Molecule scanner did not find opening \"{\"");
         }
         
         // now read in the site types
@@ -384,9 +391,9 @@ public class GMolecule {
         for(int i=0;i<totalTypes;i++){
             types.add(GSiteType.readType(tempMol, line.get(i+2)));
         }
-//        for(int i=0;i<types.size();i++){
-//            System.out.println(types.get(i).getName());
-//        }
+        for(int i=0;i<types.size();i++){
+            lg.trace(types.get(i).getName());
+        }
         
         // Now read in the sites
         ArrayList<GSite> sites = new ArrayList<>();
@@ -399,10 +406,10 @@ public class GMolecule {
             siteString[0] = line.get(i);
             siteString[1] = line.get(i+1);
             siteString[2] = line.get(i+2);
-//            for(int j=0;j<3;j++){
-//                System.out.println("Grabbing line " + i);
-//                System.out.println("siteString [" + j + "] = " + siteString[j]);
-//            }
+            for(int j=0;j<3;j++){
+                lg.trace("Grabbing line " + i);
+                lg.trace("siteString [" + j + "] = " + siteString[j]);
+            }
             // Get the site index
             sc1 = new Scanner(siteString[0]);
             sc1.next();
@@ -413,7 +420,7 @@ public class GMolecule {
             // Get the initial state
             sc1.next(); sc1.next(); sc1.next();
             String initialStateName = IOHelp.getNameInQuotes(sc1);
-            // System.out.println("siteIndex = " + siteIndex);
+            lg.trace("siteIndex = " + siteIndex);
             // Get the type name
             sc1 = new Scanner(siteString[1]);
             sc1.next();
@@ -422,10 +429,10 @@ public class GMolecule {
             tempName = IOHelp.getNameInQuotes(sc1);
             for (GSiteType type : types) {
                 String tName = type.getName();
-//                System.out.println("types[" + j + "] has name " + tName);
-//                System.out.println("Temp name is " + tempName);
-//                boolean match = tName.equals(tempName);
-//                System.out.println("The name match? " + match);
+                //lg.trace("types[" + j + "] has name " + tName);
+                lg.trace("Temp name is " + tempName);
+                boolean match = tName.equals(tempName);
+                lg.trace("The name match? " + match);
                 if (tempName.equals(tName)) {
                     tempSite = new GSite(tempMol, type);
                     break;
@@ -433,7 +440,7 @@ public class GMolecule {
             }
             // Make sure the tempsite has been initialized at this point
             if(tempSite == null){
-                System.out.println("ERROR: Did not initialize the site with a type!");
+                lg.error("ERROR: Did not initialize the site with a type!");
                 break;
             }
             tempSite.setLocation(loc);
@@ -452,7 +459,7 @@ public class GMolecule {
                     case "z":{ tempSite.setZ(sc1.nextDouble());
                     break;
                     }
-                    default:{ System.out.println("ERROR: Couldn't read (x,y,z) values.");
+                    default:{ lg.error("ERROR: Couldn't read (x,y,z) values.");
                     }
                 }
             }
@@ -461,9 +468,9 @@ public class GMolecule {
             sites.add(tempSite);
             
         }
-//        for(int k = 0;k<sites.size();k++){
-//            System.out.println("Index of site " + k + " is " + sites.get(k).getIndex());
-//        }
+        for(int k = 0;k<sites.size();k++){
+            lg.trace("Index of site " + k + " is " + sites.get(k).getIndex());
+        }
         
         // Finally, we add the links
         ArrayList<GLink> links = new ArrayList<>();
@@ -484,7 +491,7 @@ public class GMolecule {
             sc2.next();
             i2 = sc2.nextInt();
             for (GSite site : sites) {
-                // System.out.println("GSite " + j + " index is " + sites.get(j).getIndex() );
+                //lg.trace("GSite " + j + " index is " + sites.get(j).getIndex() );
                 if (i1 == site.getIndex()) {
                     site1 = site;
                 }

@@ -1,5 +1,7 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.vcell.data.LangevinPostprocessor;
@@ -22,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class ClusterAnalisysTest {
+
+    public static final Logger lg = LogManager.getLogger(ClusterAnalisysTest.class);
 
     public enum InputSource {
         RESOURCES("classpath", "Loading from classpath resources."),
@@ -115,7 +119,7 @@ public class ClusterAnalisysTest {
      // - the @sim_base_name + _FOLDER/data folder and all its content (Run0, Run1, ... folders and their content
     public static void classpathInitialization() throws IOException, URISyntaxException {
 
-        System.out.println("Classpath: " + System.getProperty("java.class.path"));
+        lg.info("Classpath: " + System.getProperty("java.class.path"));
 
         // override for "classpath"
         sim_base_name = "SimID_35189106_0_";
@@ -154,44 +158,44 @@ public class ClusterAnalisysTest {
     @AfterAll
     public static void tearDown() throws IOException {
         if(InputSource.LOCAL == inputSource) {
-            System.out.println("For InputSource.LOCAL manual delete of the files created during Tests is needed");
+            lg.info("For InputSource.LOCAL manual delete of the files created during Tests is needed");
             return;
         }
         if (!workDirPathMap.isEmpty()) {
             // this should not happen since we call cleanUp() @AfterEach
             throw new RuntimeException("One or more temp directories still exist, cleanup() may have failed");
         }
-        System.out.println("Finished cleaning up all temporary folders successfully");
+        lg.info("Finished cleaning up all temporary folders successfully");
     }
 
     @AfterEach
     private void cleanUp() throws IOException {
         if(InputSource.LOCAL == inputSource) {
-            System.out.println("For InputSource.LOCAL manual delete of the files created during Tests is needed");
+            lg.info("For InputSource.LOCAL manual delete of the files created during Tests is needed");
             return;
         }
         if (workDirPath != null && Files.exists(workDirPath)) {
             deleteRecursively(workDirPath);
         }
         if (Files.exists(workDirPath)) {
-            System.err.println("Failed to delete temp directory: " + workDirPath + ", retrying");
+            lg.error("Failed to delete temp directory: " + workDirPath + ", retrying");
             System.gc(); // hint JVM to release file handles
             try {
                 Thread.sleep(200);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt(); // restore interrupt status
-                System.err.println("Interrupted during delete retry: " + workDirPath);
+                lg.error("Interrupted during delete retry: " + workDirPath);
                 return;
             }
             deleteRecursively(workDirPath);
             if (Files.exists(workDirPath)) {
-                System.err.println("Failed to delete temp directory after retry: " + workDirPath);
+                lg.error("Failed to delete temp directory after retry: " + workDirPath);
             } else {
-                System.out.println("Cleaned up temp directory after retry: " + workDirPath);
+                lg.info("Cleaned up temp directory after retry: " + workDirPath);
                 workDirPathMap.remove(workDirPath.toString());
             }
         } else {
-            System.out.println("Cleaned up temp directory: " + workDirPath);
+            lg.info("Cleaned up temp directory: " + workDirPath);
             workDirPathMap.remove(workDirPath.toString());
         }
     }
@@ -243,7 +247,7 @@ public class ClusterAnalisysTest {
         // we get 3 advanced statistics files - unrelated to NumRuns!
         assertTrue(3 == csvFiles.length, "number of .csv files should be equal to 3");
 
-        System.out.println("done");
+        lg.info("done");
     }
 
     @Test
@@ -274,7 +278,7 @@ public class ClusterAnalisysTest {
         assertTrue(NumRuns == nameToJsonFileMap.size(), "number of .json files should be equal to " + NumRuns);
         assertTrue(NumRuns == allRunsClusterInfoMap.size(), "number of .json files should be equal to " + NumRuns);
 
-        System.out.println("done");
+        lg.info("done");
     }
 
     @Test
@@ -306,7 +310,7 @@ public class ClusterAnalisysTest {
         File[] jsonFiles = simulationFolder.listFiles((dir, name) -> name.toLowerCase().endsWith(".json"));
         assertNotNull(jsonFiles, "Directory listing failed or simulationFolder is not a directory");
         assertEquals(jsonFiles.length, (int) NumRuns, "Expected " + NumRuns + " JSON files, but found " + jsonFiles.length);
-        System.out.println("done");
+        lg.info("done");
     }
 
     // do not run on github actions, it's somewhat long
@@ -352,7 +356,7 @@ public class ClusterAnalisysTest {
         // we get 3 advanced statistics files - unrelated to NumRuns!
         assertTrue(3 == csvFiles.length, "number of .csv files should be equal to 3");
 
-        System.out.println("done");
+        lg.info("done");
     }
 
 

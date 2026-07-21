@@ -280,6 +280,7 @@ public class OnRateSolver {
      *
      * Used only in @Tests
      * TODO: to make this really useful we should also test validity of lambda calculated the new way (Boris)
+     *  TODO: we should move this to the client and raise issues if the inequalities are not satisfied.
      */
     public static void checkInequalities(double p, double R, double D, double kon, double dt){
         // <editor-fold defaultstate="collapsed" desc="Method Code">  
@@ -298,14 +299,14 @@ public class OnRateSolver {
         } else{
             lg.info("");
             double rms = Math.sqrt(2*D_scale*dt);
-            System.out.print("rms = " + rms + ". ");
+            lg.info("rms = " + rms + ". ");
             double rhs2;
             if(R-p < p){
                 rhs2 = R-p;
-                System.out.print("Smallest distance scale is R-p = " + rhs2 + ". ");
+                lg.info("Smallest distance scale is R-p = " + rhs2 + ". ");
             } else {
                 rhs2 = p;
-                System.out.print("Smallest distance scale is p = " + rhs2 + ". ");
+                lg.info("Smallest distance scale is p = " + rhs2 + ". ");
             }
             boolean check2 = (rms < rhs2);
             lg.info("rms < dist_min is " + check2 + ".  Ratio:" + rms/rhs2);

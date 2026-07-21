@@ -20,6 +20,8 @@ import edu.uchc.cam.langevin.g.reaction.GAllostericReaction;
 import edu.uchc.cam.langevin.g.reaction.GBindingReaction;
 import edu.uchc.cam.langevin.g.reaction.GTransitionReaction;
 import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.math.BigInteger;
 import java.nio.file.Path;
@@ -30,7 +32,9 @@ import java.util.HashMap;
 import java.io.*;
 
 public class Global {
-    
+
+    public static final Logger lg = LogManager.getLogger(Global.class);
+
     /* ********** Strings to represent the different object categories ****/
     public final static String SPATIAL_INFORMATION = "SYSTEM INFORMATION";
     public final static String TIME_INFORMATION = "TIME INFORMATION";
@@ -83,7 +87,7 @@ public class Global {
     private boolean countClusters;
     private BigInteger startSeed = null;
     
-    public Global(File inFile){
+    public Global(File inFile) throws IOException {
         
         systemTimes = new GSystemTimes();
         boxGeometry = new GBoxGeometry();
@@ -97,16 +101,14 @@ public class Global {
         
         // Default
         countClusters = false;
-        try{
+        try {
             readFile(inputFile.toString());
-            
-        } catch(IOException e){
-            System.out.println("Encountered an IO error when reading file.");
-            e.printStackTrace(System.out);
-        } 
+        } catch (IOException e) {
+            throw new IOException("Failed to read input file: " + inputFile.getAbsolutePath(), e);
+        }
     }
     
-    public Global(File inFile, File outFile){
+    public Global(File inFile, File outFile) throws IOException {
         
         systemTimes = new GSystemTimes();
         boxGeometry = new GBoxGeometry();
@@ -120,8 +122,7 @@ public class Global {
             readFile(inputFile.toString());
             
         } catch(IOException e){
-            System.out.println("Encountered an IO error when reading file.");
-            e.printStackTrace(System.out);
+            throw new IOException("Failed to read input file: " + inputFile.getAbsolutePath(), e);
         } 
     }
     
@@ -282,8 +283,8 @@ public class Global {
                     }
             }
             moleculeID++;
-            if(moleculeID > 4000){
-                System.out.println("WARNING: ID system is not made to handle more than 3000 molecule types.");
+            if (moleculeID > 4000) {
+                throw new IllegalStateException("Molecule ID exceeds supported range (max 3000). Received moleculeID = " + moleculeID);
             }
         }
     }
@@ -417,8 +418,8 @@ public class Global {
                                 }
                                 break;
                             default:
-                                System.out.println("SimulationOptions loadData received unexpected input line. " +
-                                        "Input = " + innerNext[0] + " : " + innerNext[1] );
+                                throw new IllegalArgumentException("SimulationOptions.loadData received unexpected input line: " +
+                                                innerNext[0] + " : " + innerNext[1]);
                         }
                     }
                 }

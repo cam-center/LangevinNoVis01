@@ -1,11 +1,15 @@
 package org.vcell.data;
 
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
@@ -14,6 +18,8 @@ import java.util.regex.Pattern;
 
 
 public class LangevinPostprocessor {
+
+    public static final Logger lg = LogManager.getLogger(LangevinPostprocessor.class);
 
     public static final String FULL_BOND_DATA_CSV = "FullBondData.csv";
     public static final String FULL_COUNT_DATA_CSV = "FullCountData.csv";

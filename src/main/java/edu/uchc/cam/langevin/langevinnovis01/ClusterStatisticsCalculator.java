@@ -1,11 +1,15 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.vcell.data.LangevinPostprocessor;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class ClusterStatisticsCalculator {
+
+    public static final Logger lg = LogManager.getLogger(ClusterStatisticsCalculator.class);
 
     public static class Statistics {
         double averageClusterSize;

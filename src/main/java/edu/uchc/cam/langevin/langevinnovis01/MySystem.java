@@ -1139,8 +1139,7 @@ public class MySystem {
                 if(useOutputFile){
                     try(PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), true), true)){
                         p.println("Simulation " + percentComplete + "% complete. Elapsed time: " + IOHelp.formatTime(startTime, now));
-                    } catch (IOException ioe){
-                        ioe.printStackTrace(System.out);
+                    } catch (IOException ioe) {
                         lg.warn("Could not write progress update to output file: " + g.getOutputFile(), ioe);
                     }
                 } else {
@@ -1162,8 +1161,8 @@ public class MySystem {
         stopTime = System.currentTimeMillis();
         try(PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "RunningTime.txt")))){
             pw.println("Running Time: " + IOHelp.formatTime(startTime, stopTime));
-        }catch (IOException e){
-            e.printStackTrace(System.out);
+        } catch (IOException e) {
+            lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
@@ -1227,8 +1226,8 @@ public class MySystem {
             p.print("ysize\t" + ymax + "\n");
             p.print("z_outside\t" + (-zmin) + "\n");
             p.print("z_inside\t" + zmax + "\n\n");
-        } catch(IOException e){
-            e.printStackTrace(System.out);
+        } catch (IOException e) {
+            lg.error("Failed to write viewer header: " + viewerFile.getAbsolutePath(), e);
         }
         // </editor-fold>
     }
@@ -1258,8 +1257,8 @@ public class MySystem {
                         + b.getSite(1).getID() + "\n");
             }
             p.print("\n");
-        } catch(IOException e){
-            e.printStackTrace(System.out);
+        } catch (IOException e) {
+            lg.error("Failed to write positions in: " + viewerFile.getAbsolutePath(), e);
         }
         imageCounter++;
         // </editor-fold>
@@ -1272,8 +1271,8 @@ public class MySystem {
             for(String idString : moleculeIDs){
                 p.println(idString);
             }
-        }catch(IOException ioe){
-            ioe.printStackTrace(System.out);
+        } catch (IOException ioe) {
+            lg.error("Failed to write MoleculeIDs.csv in folder: " + dataFolder.getAbsolutePath(), ioe);
         }
         // </editor-fold>
     }
@@ -1286,7 +1285,7 @@ public class MySystem {
                 p.println(idString);
             }
         }catch(IOException ioe){
-            ioe.printStackTrace(System.out);
+            lg.error("Failed to write SiteIDs.csv in folder: " + dataFolder.getAbsolutePath(), ioe);
         }
         // </editor-fold>
     }

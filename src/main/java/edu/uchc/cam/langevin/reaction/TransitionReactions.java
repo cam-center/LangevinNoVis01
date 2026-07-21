@@ -18,8 +18,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import edu.uchc.cam.langevin.helpernovis.Rand;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class TransitionReactions {
+
+    public static final Logger lg = LogManager.getLogger(TransitionReactions.class);
 
     // Check to see if we even have a reaction. As many states won't have a
     // this check should be faster than calling ArrayList.isEmpty. 
@@ -152,11 +156,14 @@ public class TransitionReactions {
         if (bondLength != null) {
             bond.setBondLength(bondLength);
         }
-//        Site s0 = bond.getSites()[0];
-//        Site s1 = bond.getSites()[1];
-//        String who = s0.getType() + ";" + s0.getState().getName() + " and " + s1.getType() + ";" + s1.getState().getName();
-//        double koff = bindingReactions.getOffProb(id, partnerID);
-//        System.out.println("Transition reaction occured, new bond for " + bond.getName() + "koff: " + koff + " between " + who);
+        if (lg.isDebugEnabled()) {
+            Site s0 = bond.getSites()[0];
+            Site s1 = bond.getSites()[1];
+            String who = s0.getType() + ";" + s0.getState().getStateName() +
+                    " and " + s1.getType() + ";" + s1.getState().getStateName();
+            double koff = bindingReactions.getOffProb(id, partnerID);
+            lg.debug("Transition reaction occurred, new bond for " + bond.getName() + " koff: " + koff + " between " + who);
+        }
     }
     
     private boolean reactionOccurs(double rate){

@@ -13,10 +13,14 @@ import edu.uchc.cam.langevin.helpernovis.IOHelp;
 import java.io.PrintWriter;
 import java.util.Scanner;
 import edu.uchc.cam.langevin.langevinnovis01.Global;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 public class GStateCounter {
-    
+
+    public static final Logger lg = LogManager.getLogger(GStateCounter.class);
+
     private final GState gstate;
     private boolean countTotal;
     private boolean countFree;

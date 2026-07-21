@@ -11,9 +11,15 @@ import java.util.Scanner;
 import java.util.ArrayList;
 
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
+import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GSiteType {
-/* Example:
+
+    public static final Logger lg = LogManager.getLogger(GSiteType.class);
+
+    /* Example:
     the list of GSiteTypes belonging to a GMolwcule
 
                  TYPE: Name "Site0" Radius 1.00000 D 1.000 Color BLUE STATES "state0"
@@ -161,7 +167,7 @@ public class GSiteType {
         GSiteType tempType = new GSiteType(mol, "TempName");
         Scanner sc = new Scanner(s);
         if(!sc.next().equals("TYPE:")){
-            System.out.println("ERROR: Type line did not begin with \"TYPE:\"");
+            lg.error("ERROR: Type line did not begin with \"TYPE:\"");
         }
         while(sc.hasNext()){
             String scnext = sc.next();
@@ -195,7 +201,7 @@ public class GSiteType {
                     break;
                 }
                 default:{
-                    System.out.println("Type reader received unexpected input: " + scnext);
+                    lg.error("Type reader received unexpected input: " + scnext);
                 }
             }
         }
