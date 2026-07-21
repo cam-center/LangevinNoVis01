@@ -343,10 +343,10 @@ public class GMolecule {
         
         Scanner sc0 = new Scanner(line.get(0)); 
         // check input line
-        if(!sc0.next().equals("MOLECULE:")){
-            // we'll throw some exception eventually but for now we want to log as much as possible of what went wrong
-            lg.error("ERROR: Molecule scanner does not begin with \"MOLECULE:\"");
-        }
+//        if(!sc0.next().equals("MOLECULE:")){
+//            // we'll throw some exception eventually but for now we want to log as much as possible of what went wrong
+//            lg.error("ERROR: Molecule scanner does not begin with \"MOLECULE:\"");
+//        }
         
         tempMol.setName(IOHelp.getNameInQuotes(sc0));
         tempMol.setLocation(sc0.next());
