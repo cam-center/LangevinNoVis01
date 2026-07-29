@@ -16,6 +16,9 @@ import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class ConsolidationPostprocessor {
@@ -73,6 +76,33 @@ public class ConsolidationPostprocessor {
             simulationName = simulationName.substring(0, dotIndex);
         } else {
             throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
+        }
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // The simulate step writes the Run-0 per-particle trajectory ("viewer") file into a
+    //   <simulationName>_FOLDER/viewer_files/<simulationName>_VIEW_Run0.txt
+    // subfolder (see MySystem.folderSetup / writePositions). VCell's data layer only discovers
+    // flat, canonically-named files directly in the user dir (the same place the aggregate .ida
+    // files land), so copy the viewer file up to a flat name <simulationName>_VIEW_Run0.txt. This
+    // is a cheap file copy (no computation); it lets VCell serve the trajectory to the SaLaD 3D
+    // renderer. Absence of the viewer file is not an error (e.g. a run that produced no frames).
+    public void canonicalizeTrajectoryFile() {
+        String viewerFileName = simulationName + "_VIEW_Run0.txt";
+        Path source = simulationFolder.toPath()
+                .resolve(simulationName + "_FOLDER")
+                .resolve("viewer_files")
+                .resolve(viewerFileName);
+        Path target = simulationFolder.toPath().resolve(viewerFileName);
+        if (!Files.exists(source)) {
+            lg.warn("Trajectory viewer file not found, skipping canonicalization: " + source);
+            return;
+        }
+        try {
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            lg.info("Canonicalized trajectory viewer file to " + target);
+        } catch (IOException e) {
+            lg.warn("Failed to canonicalize trajectory viewer file " + source + " -> " + target, e);
         }
     }
 
