@@ -86,6 +86,7 @@ public class PostCommand implements Callable<Integer> {
         cp.calculateLangevinPrimaryStatistics();
         cp.calculateLangevinAdvancedStatistics();
         cp.canonicalizeTrajectoryFile();    // copy Run-0 viewer file to a flat name for VCell to serve
+        cp.canonicalizeSiteIdsFile();       // ... and the site ids that name each particle in it
 
         modelFile = null;
         return 0;
