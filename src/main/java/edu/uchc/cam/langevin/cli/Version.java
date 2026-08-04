@@ -19,7 +19,7 @@ public class Version implements CommandLine.IVersionProvider {
                 long start = System.currentTimeMillis();
                 gitHash = (new String(buffer, 0, bytesRead).replace("\n", "")).trim();
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             System.err.println("Failed to get git hash: " + ex.getMessage());
         }
         GIT_VERSION = gitHash;

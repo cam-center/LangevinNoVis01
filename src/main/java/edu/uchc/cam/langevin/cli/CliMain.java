@@ -1,5 +1,6 @@
 package edu.uchc.cam.langevin.cli;
 
+import edu.uchc.cam.langevin.langevinnovis01.LoggingInit;
 import picocli.CommandLine;
 
 @CommandLine.Command(
@@ -14,7 +15,8 @@ import picocli.CommandLine;
 public class CliMain {
     public static void main(String[] args) {
         int exitCode = -1;
-        try{
+        try {
+            LoggingInit.configureLogging();
             CommandLine commandLine = new CommandLine(new CliMain());
             exitCode = commandLine.execute(args);
         } catch (Throwable t){
