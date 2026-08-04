@@ -28,7 +28,7 @@ public class ReactionCounter {
     // A counter to tell us how many times we've taken data (data point index)
     // counter == 0  is the initial condition before any reactions have occurred,
     // counter == 1 is the first data point after the first dtdata time interval, etc.
-    private int counter = 1;
+    private int counter = 0;
     private final double [] time;
 
     private final ArrayList<GReactionInterface> reactionList = new ArrayList<>();
@@ -77,9 +77,13 @@ public class ReactionCounter {
     // of occurrences for each reaction in the count hashmap
     public void initDatapoint() {
         if(counter < time.length) {
+            counter++;
+            if(counter >= totalCount) {
+                lg.error("ReactionCounter: counter >= totalCount, counter = " + counter + ", totalCount = " + totalCount);
+                return;
+            }
             double ttt = sys.getTime();    // error accumulates
             time[counter] = counter * dtdata;   // error doesn't accumulate, although even counter * dtdata had a small error at times
-            counter++;
         }
     }
 
