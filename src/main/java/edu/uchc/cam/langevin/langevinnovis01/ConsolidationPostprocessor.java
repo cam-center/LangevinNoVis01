@@ -16,6 +16,9 @@ import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class ConsolidationPostprocessor {
@@ -73,6 +76,59 @@ public class ConsolidationPostprocessor {
             simulationName = simulationName.substring(0, dotIndex);
         } else {
             throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
+        }
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // The simulate step writes the Run-0 per-particle trajectory ("viewer") file into a
+    //   <simulationName>_FOLDER/viewer_files/<simulationName>_VIEW_Run0.txt
+    // subfolder (see MySystem.folderSetup / writePositions). VCell's data layer only discovers
+    // flat, canonically-named files directly in the user dir (the same place the aggregate .ida
+    // files land), so copy the viewer file up to a flat name <simulationName>_VIEW_Run0.txt. This
+    // is a cheap file copy (no computation); it lets VCell serve the trajectory to the SaLaD 3D
+    // renderer. Absence of the viewer file is not an error (e.g. a run that produced no frames).
+    //
+    // Both canonicalize* methods only ADD a file beside the existing outputs — nothing the
+    // standalone SpringSaLaD application reads is moved, renamed or changed.
+    public void canonicalizeTrajectoryFile() {
+        String viewerFileName = simulationName + "_VIEW_Run0.txt";
+        Path source = simulationFolder.toPath()
+                .resolve(simulationName + "_FOLDER")
+                .resolve("viewer_files")
+                .resolve(viewerFileName);
+        canonicalize(source, viewerFileName, "trajectory viewer");
+    }
+
+    // The simulate step also writes, for each run, a SiteIDs.csv naming every site it created:
+    //   <simulationName>_FOLDER/data/Run0/SiteIDs.csv
+    // holding "<siteId>,<MoleculeName> Site <n> SiteType <TypeName>" per site (see
+    // MySystem.writeSiteIDs). It is what lets a consumer of the Run-0 trajectory say which molecule
+    // and site each particle is, rather than guessing from its color and radius. Copy it up to a
+    // flat name for the same reason as the viewer file, and additionally because the _FOLDER may be
+    // pruned once a run is archived, which would otherwise lose the names.
+    public void canonicalizeSiteIdsFile() {
+        Path source = simulationFolder.toPath()
+                .resolve(simulationName + "_FOLDER")
+                .resolve("data")
+                .resolve("Run0")
+                .resolve("SiteIDs.csv");
+        canonicalize(source, simulationName + "_SiteIDs_Run0.csv", "site id");
+    }
+
+    // Copy one of the simulate step's subfolder outputs up to a flat, canonically-named file in the
+    // simulation folder. A missing source is not an error: a run may legitimately not have produced
+    // it, and neither file is required for the run's primary results.
+    private void canonicalize(Path source, String targetName, String description) {
+        Path target = simulationFolder.toPath().resolve(targetName);
+        if (!Files.exists(source)) {
+            lg.warn("Run-0 " + description + " file not found, skipping canonicalization: " + source);
+            return;
+        }
+        try {
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            lg.info("Canonicalized " + description + " file to " + target);
+        } catch (IOException e) {
+            lg.warn("Failed to canonicalize " + description + " file " + source + " -> " + target, e);
         }
     }
 
