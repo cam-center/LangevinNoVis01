@@ -116,8 +116,7 @@ public class Global {
 //        System.setProperty("log4j.configurationFile", ""); // disable external config
 //        System.setProperty("log4j2.disable.jmx", "true");
 //        LoggingInit.configureLogging();  // now this actually takes effect
-
-        lg.info("Global constructor called");
+//        lg.info("Global constructor called");
 
         systemTimes = new GSystemTimes();
         boxGeometry = new GBoxGeometry();
