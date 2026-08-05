@@ -14,12 +14,14 @@
           Example: level="info" shows INFO, WARN, ERROR, FATAL.
                    level="debug" shows DEBUG, INFO, WARN, ERROR, FATAL.
                    level="trace" shows everything.
+
+    Pattern example: <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{36} - %msg%n"/>
+
 -->
 
 <Configuration status="WARN">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-<!--            <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{36} - %msg%n"/>  -->
             <PatternLayout pattern="%msg%n"/>
         </Console>
     </Appenders>
@@ -29,3 +31,24 @@
         </Root>
     </Loggers>
 </Configuration>
+
+
+
+<!--
+    This configuration is used to disable all logging output from Log4j2.
+    We use it to test the logging configured in the application code itself, in LoggingInit.java by invoking
+    LoggingInit.configureLogging(); in Global.java, which will override this configuration and enable logging.
+
+    To enable logging, you can change the level attribute of the <Root> element to a desired
+    level (e.g., "info", "debug", "trace").
+
+
+
+<Configuration status="WARN">
+    <Loggers>
+        <Root level="off"/>
+    </Loggers>
+</Configuration>
+
+-->
+

@@ -25,9 +25,11 @@ public class ReactionCounter {
     private final double dtdata;    // time interval between data points
     private final int totalCount;   // number of data points
 
-    // A counter to tell us how many times we've taken data (data point index)
-    // counter == 0  is the initial condition before any reactions have occurred,
-    // counter == 1 is the first data point after the first dtdata time interval, etc.
+    // Index of the datapoint that reactions are currently tallied into (arr[counter]).
+    // Index 0 is the initial condition at t=0 and must stay reaction-free, so we begin
+    // accumulating at index 1. It advances one step at each dtdata boundary (initDatapoint())
+    // and is capped at the last datapoint, so reactions in the sub-dtdata tail after the final
+    // boundary fold into the last datapoint instead of indexing past the arrays.
     private int counter = 1;
     private final double [] time;
 
@@ -47,6 +49,12 @@ public class ReactionCounter {
         dtdata = g.getdtdata();
         totalCount = 1 + (int)Math.floor(g.getTotalTime() / g.getdtdata());
         time = new double[totalCount];
+        for (int i = 0; i < totalCount; i++) {
+            time[i] = i * dtdata;   // datapoint times are fixed by index; time[0] == 0 (the t=0 initial condition)
+        }
+        if (totalCount == 1) {
+            counter = 0;            // degenerate case: only the t=0 datapoint exists, so accumulate there
+        }
 
         for (GDecayReaction r : g.getDecayReactions()) {
             String name = r.getName();
@@ -72,13 +80,12 @@ public class ReactionCounter {
         }
     }
 
-    // we refresh the content of the count hashmap in real time, every time a reaction happens
-    // here we just set the index of the current datapoint (count) which will be used to store the number
-    // of occurrences for each reaction in the count hashmap
+    // Called at each dtdata boundary. Reactions are tallied into arr[counter] as they occur;
+    // this advances counter to the next datapoint. It is capped at the final index so reactions
+    // in the sub-dtdata tail after the last boundary fold into the last datapoint rather than
+    // indexing past the end of the arrays.
     public void initDatapoint() {
-        if(counter < time.length) {
-            double ttt = sys.getTime();    // error accumulates
-            time[counter] = counter * dtdata;   // error doesn't accumulate, although even counter * dtdata had a small error at times
+        if (counter < totalCount - 1) {
             counter++;
         }
     }
