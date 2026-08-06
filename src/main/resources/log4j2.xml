@@ -1,24 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Log4j2 Level Hierarchy (most → least verbose)
+    Authoritative, immutable logging configuration for the Langevin solver.
 
-        TRACE  - extremely fine‑grained diagnostic output
-        DEBUG  - detailed debugging information
-        INFO   - routine operational messages (default "always show")
-        WARN   - something unexpected but not fatal
-        ERROR  - an operation failed; something is broken
-        FATAL  - the system is unusable; immediate attention required
-        OFF    - disable all logging
+    This file is the single source of truth for logging in BOTH the JVM (jar/tests) and the
+    GraalVM native executable. Log4j2 (>= 2.25) ships GraalVM reachability metadata whose
+    resource-config bundles the "log4j2.*" pattern, so this file is compiled into the native
+    image and loaded from the classpath at startup. There is no programmatic configuration and
+    no runtime lookup of an external log4j2.xml on the filesystem.
 
-    Rule: Setting <Root level="X"> shows X and everything BELOW it in this list.
-          Example: level="info" shows INFO, WARN, ERROR, FATAL.
-                   level="debug" shows DEBUG, INFO, WARN, ERROR, FATAL.
-                   level="trace" shows everything.
-
-    Pattern example: <PatternLayout pattern="%d{HH:mm:ss} %-5level %logger{36} - %msg%n"/>
-
+    Level hierarchy (most -> least verbose): TRACE, DEBUG, INFO, WARN, ERROR, FATAL, OFF.
+    <Root level="X"> shows X and everything below it. To change verbosity, edit the level here
+    and rebuild; it is intentionally not meant to be overridden at runtime.
 -->
-
 <Configuration status="WARN">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
@@ -31,24 +24,3 @@
         </Root>
     </Loggers>
 </Configuration>
-
-
-
-<!--
-    This configuration is used to disable all logging output from Log4j2.
-    We use it to test the logging configured in the application code itself, in LoggingInit.java by invoking
-    LoggingInit.configureLogging(); in Global.java, which will override this configuration and enable logging.
-
-    To enable logging, you can change the level attribute of the <Root> element to a desired
-    level (e.g., "info", "debug", "trace").
-
-
-
-<Configuration status="WARN">
-    <Loggers>
-        <Root level="off"/>
-    </Loggers>
-</Configuration>
-
--->
-
