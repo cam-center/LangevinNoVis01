@@ -22,7 +22,6 @@ import edu.uchc.cam.langevin.g.reaction.GTransitionReaction;
 import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.LoggerContext;
 
 import java.math.BigInteger;
 import java.nio.file.Path;
@@ -110,13 +109,6 @@ public class Global {
     }
     
     public Global(File inFile, File outFile) throws IOException {
-
-//        LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
-//        ctx.stop();   // <-- critical: resets Log4j2 completely
-//        System.setProperty("log4j.configurationFile", ""); // disable external config
-//        System.setProperty("log4j2.disable.jmx", "true");
-//        LoggingInit.configureLogging();  // now this actually takes effect
-//        lg.info("Global constructor called");
 
         systemTimes = new GSystemTimes();
         boxGeometry = new GBoxGeometry();

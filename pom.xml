@@ -15,8 +15,11 @@
         <commons-csv.version>1.10.0</commons-csv.version>
         <junit.jupiter.version>5.8.1</junit.jupiter.version>
         <picocli.version>4.6.3</picocli.version>
-        <log4j-api.version>2.24.0</log4j-api.version>
-        <log4j-core.version>2.24.0</log4j-core.version>
+        <!-- 2.25+ ships GraalVM native-image reachability metadata: it bundles log4j2.xml
+             (the "log4j2.*" resource pattern) and Log4j2Plugins.dat into the native image and
+             registers plugin reflection, so the compiled-in log4j2.xml is the authoritative config. -->
+        <log4j-api.version>2.25.1</log4j-api.version>
+        <log4j-core.version>2.25.1</log4j-core.version>
     </properties>
 
     <dependencies>
