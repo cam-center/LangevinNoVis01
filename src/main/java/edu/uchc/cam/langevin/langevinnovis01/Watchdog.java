@@ -80,19 +80,35 @@ public class Watchdog {
         File log0 = new File(simulationFolder, simulationName + "_0.log");
 
         // first while loop, we look for the first log file to be created, meaning that slurm started launching simulation tasks
+        // ignore stale logs from previous runs
         while (true) {
             // the first log file, for simulation 0 should be created very soon, although it will be empty
             // for very long simulation (may take 1 week!) the first 1% advance may take hours though
-            if (log0.exists()) {
-                lg.info("Found log file for run 0: " + log0.getAbsolutePath());
-                break;
-            }
             long elapsed = System.currentTimeMillis() - start;
-            lg.info("Waiting for log file: " + log0.getAbsolutePath() + " (elapsed time: " + elapsed / 1000L + " seconds)");
-            if (elapsed >= timeoutMillis) {
-                lg.error("Timeout waiting for log file: " + log0.getAbsolutePath());
-                throw new RuntimeException("Watchdog timeout: log file not found");
+
+            if (log0.exists()) {
+                long lastModified = log0.lastModified();
+
+                if (lastModified >= start) {
+                    lg.info("Found fresh log file for run 0: " + log0.getAbsolutePath()
+                            + " (lastModified=" + lastModified + ")");
+                    break;   // proceed to second loop
+                } else {
+                    lg.warn("Ignoring stale log file for run 0: " + log0.getAbsolutePath()
+                            + " (lastModified=" + lastModified
+                            + ", watchdogStart=" + start + ")");
+                }
             }
+
+            lg.info("Waiting for fresh log file: " + log0.getAbsolutePath()
+                    + " (elapsed time: " + (elapsed / 1000L) + " seconds)");
+
+            if (elapsed >= timeoutMillis) {
+                lg.error("Timeout waiting for fresh log file: " + log0.getAbsolutePath());
+                throw new RuntimeException("Watchdog timeout: fresh log file not found");
+            }
+
+            // Sleep once per tick — absolutely required
             try {
                 Thread.sleep(watchdogTick * 1000L);
             } catch (InterruptedException e) {
