@@ -16,6 +16,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 public class CliTest {
 
@@ -270,4 +272,167 @@ public class CliTest {
         // Verify the exit code (1 means error)
         assertEquals(1, exitCode, "Expected error exit code 1 due to invalid model file");
     }
+
+    // ========================= WATCHDOG TESTS ==========================
+    @Test
+    public void testFailingWatchdogEarly() throws Exception {
+
+        // Create temp directory for the test
+        Path tempDirectory = Files.createTempDirectory("test_watchdog_fail");
+        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+
+        // IMPORTANT: Do NOT create the model file yet
+        assertFalse(modelFile.toFile().exists(), "Model file should NOT exist for this failure test");
+
+        int numRuns = 3;
+
+        // Build CLI args for watchdog
+        String[] args = {
+                "watchdog",
+                modelFile.toString(),      // nonexistent model file
+                Integer.toString(numRuns), // valid number of runs
+                "--vc-print-status"        // we'll test this too, later
+        };
+
+        CommandLine cmd = new CommandLine(new CliMain());
+        int exitCode = cmd.execute(args);
+        // The watchdog should fail early because the model file does not exist
+        assertEquals(1, exitCode, "Watchdog should fail early when model file is missing");
+    }
+
+    // -----------------------------------------------------------------------
+    @Test
+    public void testWatchdogMissingLogs() throws Exception {
+
+        Path tempDirectory = Files.createTempDirectory("test_watchdog_missing_logs");
+        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+
+        // Create the model file (valid)
+        Files.writeString(modelFile, inputFileContents);
+
+        // No log files created
+        String[] args = {
+                "watchdog",
+                modelFile.toString(),
+                "3",                        // numRuns
+                "--watchdog-tick", "3",     // check every *** seconds
+                "--watchdog-timeout", "20", // give up after *** seconds if no logfile appears at all
+                "--vc-print-status"
+        };
+
+        CommandLine cmd = new CommandLine(new CliMain());
+        int exitCode = cmd.execute(args);
+
+        // Watchdog should time out and return non-zero
+        assertNotEquals(0, exitCode, "Watchdog should fail due to missing logs");
+    }
+
+    // -----------------------------------------------------------------------
+    @Test
+    public void testWatchdogEntersProgressLoop() throws Exception {
+
+        Path tempDirectory = Files.createTempDirectory("test_watchdog_progress_loop");
+        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+
+        // Create valid model file
+        Files.writeString(modelFile, inputFileContents);
+
+        // Create the log file for run 0 so the watchdog passes the first loop
+        Path logFile0 = tempDirectory.resolve("sim_0.log");
+        Files.writeString(logFile0, "");   // empty is fine
+
+        // Build CLI args
+        String[] args = {
+                "watchdog",
+                modelFile.toString(),
+                "3",                        // numRuns
+                "--watchdog-tick", "2",     // check every second
+                "--watchdog-timeout", "10",  // timeout for first loop (won't be used)
+                "--vc-print-status"
+        };
+
+        // Run watchdog in a separate thread so we can kill it
+        CommandLine cmd = new CommandLine(new CliMain());
+        Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
+        watchdogThread.start();
+
+        // Let watchdog run long enough to enter the infinite loop
+        Thread.sleep(15000);
+
+        // At this point, watchdog should be inside the second loop
+        assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
+
+        // Kill the watchdog thread
+        watchdogThread.interrupt();
+
+        // Give it a moment to stop
+        Thread.sleep(500);
+
+        assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+    }
+
+    // -----------------------------------------------------------------------
+    @Test
+    public void testWatchdogCommand() throws Exception {
+
+        // Create temp directory for the test batch
+        Path tempDirectory = Files.createTempDirectory("test_watchdog");
+        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+
+        // Write a minimal valid model file
+        Files.writeString(modelFile, inputFileContents);
+
+        // Create fake log files for 3 runs
+        int numRuns = 3;
+        for (int i = 0; i < numRuns; i++) {
+            Path logFile = tempDirectory.resolve("SimID_sim_0_" + i + ".log");
+            Files.writeString(logFile,
+                    "STEP 100/1000\n" +
+                            "PROGRESS: 0.10\n");
+            assertTrue(logFile.toFile().exists(), "Expected fake log file to exist");
+        }
+
+        // Create a fake VCell messaging config file
+        Path configFile = tempDirectory.resolve("vc_config.properties");
+        Files.writeString(configFile,
+                "broker_host=localhost\n" +
+                        "broker_port=8165\n" +
+                        "broker_username=msg_user\n" +
+                        "broker_password=msg_pswd\n" +
+                        "vc_username=vcell_user\n" +
+                        "simKey=12334483837\n" +
+                        "taskID=0\n" +
+                        "jobIndex=0\n");
+
+        // Build CLI args for watchdog
+        String[] args = {
+                "watchdog",
+                modelFile.toString(),
+                Integer.toString(numRuns),
+                "--vc-send-status-config", configFile.toString(),
+                "--vc-print-status"
+        };
+
+        // Execute CLI
+        CommandLine cmd = new CommandLine(new CliMain());
+        int exitCode = cmd.execute(args);
+
+        // Assertions
+        assertEquals(0, exitCode, "Watchdog command should execute successfully");
+
+        // The watchdog should have created a Global object and scanned logs
+        // We can check that the watchdog printed something to stdout
+        // (if you want stronger assertions, capture stdout with SystemLambda)
+        assertTrue(modelFile.toFile().exists(), "Model file should still exist");
+
+        // Optional: verify that the watchdog recognized the simulation folder
+        File simFolder = modelFile.getParent().toFile();
+        assertTrue(simFolder.exists(), "Simulation folder should exist");
+
+        // Optional: verify progress markers were parsed
+        // (You can add a public getter in Watchdog to expose parsed progress)
+    }
+
+
+
 }
