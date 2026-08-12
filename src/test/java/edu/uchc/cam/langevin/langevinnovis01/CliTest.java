@@ -280,7 +280,7 @@ public class CliTest {
 
         // Create temp directory for the test
         Path tempDirectory = Files.createTempDirectory("test_watchdog_fail");
-        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
 
         //
         // ------------------------------ first test, missing required parameter ------------------------------
@@ -326,7 +326,7 @@ public class CliTest {
     public void testWatchdogMissingLogs() throws Exception {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_missing_logs");
-        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
 
         // Create the model file (valid)
         Files.writeString(modelFile, inputFileContents);
@@ -352,13 +352,13 @@ public class CliTest {
     public void testWatchdogStaleLog() throws Exception {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_stale_log");
-        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
 
         // Create the model file (valid)
         Files.writeString(modelFile, inputFileContents);
 
         // Create a stale log file for run 0
-        Path logFile0 = tempDirectory.resolve("sim_0.log");
+        Path logFile0 = tempDirectory.resolve("SimID_123456789_0_0.log");
         Files.writeString(logFile0, "");   // empty is fine
 
         // Make the log file stale by setting lastModified to 10 seconds ago
@@ -389,13 +389,13 @@ public class CliTest {
     public void testWatchdogEntersProgressLoop() throws Exception {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_progress_loop");
-        Path modelFile = tempDirectory.resolve("sim.langevinInput");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
 
         // Create valid model file
         Files.writeString(modelFile, inputFileContents);
 
         // Create the stale log file for run 0, execution should stay in the first while() loop for a while
-        Path logFile0 = tempDirectory.resolve("sim_0.log");
+        Path logFile0 = tempDirectory.resolve("SimID_123456789_0_0.log");
 
         // Write some stale progress messages
         String staleProgress =
@@ -425,24 +425,8 @@ public class CliTest {
         watchdogThread.start();
 
         // Create a fresh log file in another thread after a delay
-        Thread freshLogThread = new Thread(() -> {
-            try {
-                Thread.sleep(5000); // wait 5 seconds so the stale log is ignored
-                Files.writeString(logFile0, ""); // rewrite file
-                logFile0.toFile().setLastModified(System.currentTimeMillis()); // make it fresh
-
-                // Now write real progress steps every 3 seconds
-                for (int i = 1; i <= 100; i++) {
-                    Thread.sleep(3000);
-                    String line = "Simulation " + i + "% complete. Elapsed time: " + (i * 3.0) + " sec.\n";
-                    System.out.println("Writing to log: " + line.trim());
-                    Files.writeString(logFile0, line, StandardOpenOption.APPEND);
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-        freshLogThread.start();
+        Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 5000, 3000);
+        freshLog0Thread.start();
 
         // Let watchdog run long enough to detect the fresh log and enter the infinite loop
         Thread.sleep(30000);
@@ -459,6 +443,54 @@ public class CliTest {
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
     }
 
+    // -----------------------------------------------------------------------
+    @Test
+    public void testWatchdogMonitorsProgress() throws Exception {
+
+        Path tempDirectory = Files.createTempDirectory("test_watchdog_monitors_progress");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        // Create valid model file
+        Files.writeString(modelFile, inputFileContents);
+
+        // Build CLI args
+        String[] args = {
+                "watchdog",
+                modelFile.toString(),
+                "3",                        // numRuns
+                "--watchdog-tick", "3",     // check every *** seconds
+                "--watchdog-timeout", "20",  // timeout in seconds for first loop (won't be used)
+                "--vc-print-status"
+        };
+
+        // Run watchdog in a separate thread so we can kill it
+        CommandLine cmd = new CommandLine(new CliMain());
+        Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
+        watchdogThread.start();
+
+        // Create a fresh log file in another thread after a delay
+        Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 3000, 3000);
+        Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 9000, 2000);
+        Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 15000, 5000);
+        freshLog0Thread.start();
+        freshLog1Thread.start();
+        freshLog2Thread.start();
+
+        // Let watchdog run long enough to detect the fresh log and enter the infinite loop
+        Thread.sleep(30000);
+
+        // At this point, watchdog should be inside the second loop
+        assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
+
+        // we run some more, then ill the watchdog thread
+        Thread.sleep(30000);
+        watchdogThread.interrupt();
+
+        // Give it a moment to stop
+        Thread.sleep(500);
+
+        assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+    }
 
 
     // -----------------------------------------------------------------------
@@ -525,6 +557,40 @@ public class CliTest {
 //        // (You can add a public getter in Watchdog to expose parsed progress)
 //    }
 
+// -------------- Utility functions -------------------------------------
+private Thread createLogWriterThread(
+        Path simulationFolder,
+        String simulationName,
+        int logIndex,
+        int numEntries,
+        long initialDelayMillis,
+        long writeIntervalMillis) {
+
+    return new Thread(() -> {
+        try {
+            // Build the log file path for this index
+            Path logFile = simulationFolder.resolve(simulationName + logIndex + ".log");
+
+            // Initial delay before creating the fresh log file
+            Thread.sleep(initialDelayMillis);
+
+            // Rewrite file to make it fresh
+            Files.writeString(logFile, "");
+            logFile.toFile().setLastModified(System.currentTimeMillis());
+
+            // Now write real progress steps at the specified interval
+            for (int i = 1; i <= numEntries; i++) {
+                Thread.sleep(writeIntervalMillis);
+                String line = "Simulation " + i + "% complete. Elapsed time: " + (i * (writeIntervalMillis / 1000.0)) + " sec.\n";
+                System.out.println("    log " + logIndex + "++");   // ... + line.trim()
+                Files.writeString(logFile, line, StandardOpenOption.APPEND);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    });
+}
 
 
 }

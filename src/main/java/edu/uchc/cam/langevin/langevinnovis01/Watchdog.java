@@ -5,6 +5,12 @@ import org.apache.logging.log4j.Logger;
 import org.vcell.messaging.VCellMessaging;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class Watchdog {
 
@@ -17,8 +23,13 @@ public class Watchdog {
     private final int watchdogTick;
     private final int watchdogTimeout;
 
-    private String simulationName;          // model / simulation name (without extension)
-    private File simulationFolder;          // top folder, where the input file is (and also the .ida and ,json files are)
+    long watchdogStartTime;             // time when the watchdog started, used for timeout calculations
+    private int[] latestPercent;        // latest percent for each run
+    private long[] lastModifiedSeen;    // last modified timestamp we last processed
+    private int lastBatchPercent;       // percent at previous tick
+
+    private String simulationName;      // model / simulation name (without extension)
+    private File simulationFolder;      // top folder, where the input file is (and also the .ida and ,json files are)
 
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
@@ -52,8 +63,15 @@ public class Watchdog {
 
     public void setup() {
 
-        lg.info("Watchdog started");
-        // <editor-fold defaultstate="collapsed" desc="Method Code">
+        watchdogStartTime = System.currentTimeMillis();
+        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
+        String dateTime = sdf.format(new Date(watchdogStartTime));
+        lg.info("Watchdog started at " + dateTime + " (watchdogTick=" + watchdogTick + " seconds, watchdogTimeout=" + watchdogTimeout + " seconds)");
+
+        latestPercent = new int[numRuns];       // initialize progress counters
+        lastModifiedSeen = new long[numRuns];
+        lastBatchPercent = 0;
+
         File inputFile = g.getInputFile();      // model / simulation input file (the .langevininput file)
         simulationName = inputFile.getName();
         lg.info("Watchdog analyzing input file for simulation: " + simulationName);
@@ -68,6 +86,8 @@ public class Watchdog {
         } else {
             throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
         }
+        lg.info("Working folder : " + simulationFolder.getAbsolutePath());
+        lg.info("Simulation name: " + simulationName);
     }
 
 
@@ -75,28 +95,28 @@ public class Watchdog {
 
         lg.info("Watchdog entering doWork()");
 
-        long start = System.currentTimeMillis();
+//        long start = System.currentTimeMillis();
         long timeoutMillis = watchdogTimeout * 1000L;
-        File log0 = new File(simulationFolder, simulationName + "_0.log");
+        File log0 = new File(simulationFolder, simulationName + "0.log");
 
         // first while loop, we look for the first log file to be created, meaning that slurm started launching simulation tasks
         // ignore stale logs from previous runs
         while (true) {
             // the first log file, for simulation 0 should be created very soon, although it will be empty
             // for very long simulation (may take 1 week!) the first 1% advance may take hours though
-            long elapsed = System.currentTimeMillis() - start;
+            long elapsed = System.currentTimeMillis() - watchdogStartTime;
 
             if (log0.exists()) {
                 long lastModified = log0.lastModified();
 
-                if (lastModified >= start) {
+                if (lastModified >= watchdogStartTime) {
                     lg.info("Found fresh log file for run 0: " + log0.getAbsolutePath()
                             + " (lastModified=" + lastModified + ")");
                     break;   // proceed to second loop
                 } else {
                     lg.warn("Ignoring stale log file for run 0: " + log0.getAbsolutePath()
                             + " (lastModified=" + lastModified
-                            + ", watchdogStart=" + start + ")");
+                            + ", watchdogStart=" + watchdogStartTime + ")");
                 }
             }
 
@@ -140,6 +160,8 @@ public class Watchdog {
             // Reset tick timer
             lastTick = now;
 
+            update();
+
             // Sleep for watchdogTick seconds
             try {
                 Thread.sleep(watchdogTick * 1000L);
@@ -148,17 +170,121 @@ public class Watchdog {
                 lg.warn("Watchdog interrupted during progress loop");
                 return;   // allow test to kill the watchdog cleanly
             }
-
-            // STUB: no progress parsing yet
-            // Later we will:
-            //   - read new lines from log0
-            //   - detect progress markers
-            //   - send workerAlive or progress events
-
         }
-
     }
 
+    // -----------------------------------------------------------------------------------
+    // this is where we will read the log files and send progress events to vcellMessaging
+    // -----------------------------------------------------------------------------------
+    private void update() {
+
+        int sum = 0;
+
+        for (int i = 0; i < numRuns; i++) {
+
+            Path logFile = new File(simulationFolder, simulationName + i + ".log").toPath();
+            File f = logFile.toFile();
+
+            // If file does not exist, treat as 0%
+            if (!f.exists()) {
+                latestPercent[i] = 0;
+                sum += 0;
+                continue;
+            }
+
+            long lastMod = f.lastModified();
+
+            // Ignore stale logs
+            if (lastMod < watchdogStartTime) {
+                latestPercent[i] = 0;
+                sum += 0;
+                continue;
+            }
+
+            // Only re-parse if file changed since last tick
+            if (lastMod > lastModifiedSeen[i]) {
+                try {
+                    int ret = extractLatestPercent(logFile);
+                    // Only accept forward progress, progress must be monotonic and error safe
+                    if (ret >= 0 && ret <= 100 && ret > latestPercent[i]) {
+                        latestPercent[i] = ret;
+                        lastModifiedSeen[i] = lastMod;
+                    }
+                } catch (Exception e) {
+                    lg.warn("Failed to parse log file " + logFile + ": " + e.getMessage());
+                    // do not do latestPercent[i] = 0,
+                    // that equals a progress regression, we just ignore this tick and keep the previous value
+                }
+            }
+
+            sum += latestPercent[i];
+        }
+
+        int batchPercent = sum / numRuns;
+
+        // Compare with previous tick
+        if (batchPercent != lastBatchPercent) {
+            lg.info("Batch progress changed: " + lastBatchPercent + "% -> " + batchPercent + "%");
+            lastBatchPercent = batchPercent;
+        } else {
+            lg.info("Batch progress unchanged at " + batchPercent + "%");
+        }
+    }
+
+    private int extractLatestPercent(Path logFile) throws IOException {
+
+        File f = logFile.toFile();
+        long len = f.length();
+
+        if (len <= 0) {
+            return 0;
+        }
+
+        // Read only the last 512 bytes
+        int readSize = (int) Math.min(len, 512);
+        byte[] buf = new byte[readSize];
+
+        try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
+            raf.seek(len - readSize);
+            raf.readFully(buf);
+        }
+
+        String tail = new String(buf, StandardCharsets.UTF_8);
+
+        // Find the last occurrence of "Simulation "
+        int simIdx = tail.lastIndexOf("Simulation ");
+        if (simIdx < 0) {
+            return 0;
+        }
+
+        // Find the percent sign after that
+        int pctIdx = tail.indexOf("%", simIdx);
+        if (pctIdx < 0) {
+            return 0;
+        }
+
+        // Extract the number between "Simulation " and "%"
+        String numStr = tail.substring(simIdx + "Simulation ".length(), pctIdx).trim();
+
+        // Handle partial writes gracefully
+        if (numStr.length() == 0) {
+            return 0;
+        }
+
+        // Must be digits only
+        for (int i = 0; i < numStr.length(); i++) {
+            char c = numStr.charAt(i);
+            if (c < '0' || c > '9') {
+                return 0;
+            }
+        }
+
+        try {
+            return Integer.parseInt(numStr);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
 
 }
 
