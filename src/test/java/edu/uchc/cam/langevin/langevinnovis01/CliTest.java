@@ -468,10 +468,10 @@ public class CliTest {
         Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
         watchdogThread.start();
 
-        // Create a fresh log file in another thread after a delay
-        Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 3000, 3000);
-        Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 9000, 2000);
-        Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 15000, 5000);
+        // Create multiple log files and keep appending percentage growth
+        Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 3000, 4000);
+        Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 9000, 5000);
+        Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 15000, 6000);
         freshLog0Thread.start();
         freshLog1Thread.start();
         freshLog2Thread.start();
@@ -482,7 +482,7 @@ public class CliTest {
         // At this point, watchdog should be inside the second loop
         assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
 
-        // we run some more, then ill the watchdog thread
+        // we run some more, then kill the watchdog thread
         Thread.sleep(30000);
         watchdogThread.interrupt();
 
@@ -563,15 +563,17 @@ private Thread createLogWriterThread(
         String simulationName,
         int logIndex,
         int numEntries,
-        long initialDelayMillis,
-        long writeIntervalMillis) {
-
+        long initialDelayMillis,    // Initial delay before creating the fresh log file
+        long writeIntervalMillis
+) {
     return new Thread(() -> {
         try {
             // Build the log file path for this index
             Path logFile = simulationFolder.resolve(simulationName + logIndex + ".log");
 
             // Initial delay before creating the fresh log file
+            // this simulates the short time between the moment we launch the watchdog and the moment
+            // the simulation starts writing to the log file
             Thread.sleep(initialDelayMillis);
 
             // Rewrite file to make it fresh

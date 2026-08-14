@@ -26,7 +26,7 @@ public class Watchdog {
     long watchdogStartTime;             // time when the watchdog started, used for timeout calculations
     private int[] latestPercent;        // latest percent for each run
     private long[] lastModifiedSeen;    // last modified timestamp we last processed
-    private int lastBatchPercent;       // percent at previous tick
+    private double lastBatchPercent;    // percent at previous tick
 
     private String simulationName;      // model / simulation name (without extension)
     private File simulationFolder;      // top folder, where the input file is (and also the .ida and ,json files are)
@@ -193,8 +193,7 @@ public class Watchdog {
             }
 
             long lastMod = f.lastModified();
-
-            // Ignore stale logs
+            // Ignore stale logs, we get here if there's a fresh log for index 0, but we can't be sure about the others
             if (lastMod < watchdogStartTime) {
                 latestPercent[i] = 0;
                 sum += 0;
@@ -212,7 +211,7 @@ public class Watchdog {
                     }
                 } catch (Exception e) {
                     lg.warn("Failed to parse log file " + logFile + ": " + e.getMessage());
-                    // do not do latestPercent[i] = 0,
+                    // do not change latestPercent[i] or lastModifiedSeen[i]
                     // that equals a progress regression, we just ignore this tick and keep the previous value
                 }
             }
@@ -220,58 +219,74 @@ public class Watchdog {
             sum += latestPercent[i];
         }
 
-        int batchPercent = sum / numRuns;
+        double batchPercent = (double)sum / (double)numRuns;
 
         // Compare with previous tick
         if (batchPercent != lastBatchPercent) {
-            lg.info("Batch progress changed: " + lastBatchPercent + "% -> " + batchPercent + "%");
+            lg.info(String.format("Batch progress changed: %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
             lastBatchPercent = batchPercent;
         } else {
-            lg.info("Batch progress unchanged at " + batchPercent + "%");
+            lg.info(String.format("Batch progress unchanged at %.6f%%", lastBatchPercent));
         }
     }
 
-    private int extractLatestPercent(Path logFile) throws IOException {
+    /*
+     * Returns the most recent progress percentile from the logfile
+     * Returns 0 on error, but we enforce a monotonic rule in the caller, so if progress percentile regresses
+     * we just ignore it and keep the previous value
+     */
+    private int extractLatestPercent(Path logFile) {
 
         File f = logFile.toFile();
         long len = f.length();
-
         if (len <= 0) {
             return 0;
         }
 
-        // Read only the last 512 bytes
+        // Read only the last 512 bytes for speed, that's more than enough because
+        // the logfile is short, we have one entry (line) for each percent of progress, 100 lines in total,
+        // each line looking something like this: "Simulation 25% complete. Elapsed time: 520.906 sec."
         int readSize = (int) Math.min(len, 512);
         byte[] buf = new byte[readSize];
 
         try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
             raf.seek(len - readSize);
             raf.readFully(buf);
+        } catch (Exception e) {
+            return 0;
         }
 
         String tail = new String(buf, StandardCharsets.UTF_8);
 
-        // Find the last occurrence of "Simulation "
-        int simIdx = tail.lastIndexOf("Simulation ");
-        if (simIdx < 0) {
-            return 0;
-        }
-
-        // Find the percent sign after that
-        int pctIdx = tail.indexOf("%", simIdx);
+        // Find the last '%' in the tail
+        int pctIdx = tail.lastIndexOf('%');
         if (pctIdx < 0) {
             return 0;
         }
 
-        // Extract the number between "Simulation " and "%"
-        String numStr = tail.substring(simIdx + "Simulation ".length(), pctIdx).trim();
+        // Find the nearest "Simulation " BEFORE that '%' (searching backward from pctIdx)
+        int simIdx = tail.lastIndexOf("Simulation ", pctIdx);
+        if (simIdx < 0) {
+            return 0;
+        }
 
-        // Handle partial writes gracefully
+        // Extract the substring between "Simulation " and "%"
+        int start = simIdx + "Simulation ".length();
+        if (start >= pctIdx) {
+            return 0; // malformed or partial write
+        }
+
+        String numStr;
+        try {
+            numStr = tail.substring(start, pctIdx).trim();
+        } catch (StringIndexOutOfBoundsException e) {
+            return 0;   // malformed tail, partial write, or misaligned indices
+        }
         if (numStr.length() == 0) {
             return 0;
         }
 
-        // Must be digits only
+        // Validate digits only
         for (int i = 0; i < numStr.length(); i++) {
             char c = numStr.charAt(i);
             if (c < '0' || c > '9') {
