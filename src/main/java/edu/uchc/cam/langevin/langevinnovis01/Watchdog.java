@@ -3,6 +3,7 @@ package edu.uchc.cam.langevin.langevinnovis01;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.vcell.messaging.VCellMessaging;
+import org.vcell.messaging.WorkerEvent;
 
 import java.io.File;
 import java.io.IOException;
@@ -144,10 +145,12 @@ public class Watchdog {
         // if we see any new lines we calculate progress and send progress event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(.......), VCellMessaging.ThrowOnException.NO);
         lg.info("Watchdog entering progress monitoring loop for simulation: " + simulationName);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - watchdogStartTime), VCellMessaging.ThrowOnException.NO);
+
         long lastTick = System.currentTimeMillis();
         while (true) {
             // we do not timeout this! it's slurm's job to take us out of the whole script
-            // we really have no good way of knowing when the first percent of the simulation may be done
+            // we really have no good way of knowing when the first percent of the simulation may be done,
             // although we can have an educated guess from the job timeout in seconds: if we divide that by 100 we
             // can get an estimate of how long the first percent may take
 
@@ -155,7 +158,7 @@ public class Watchdog {
             long elapsed = (now - lastTick) / 1000L;
 
             // Log that we are alive inside the second loop
-            lg.info("Watchdog progress loop tick — elapsed " + elapsed + " seconds since last tick");
+//            lg.info("Watchdog progress loop tick — elapsed " + elapsed + " seconds since last tick");
 
             // Reset tick timer
             lastTick = now;
@@ -221,12 +224,17 @@ public class Watchdog {
 
         double batchPercent = (double)sum / (double)numRuns;
 
+        double now = System.currentTimeMillis();
+        double elapsed = now - watchdogStartTime;
+
         // Compare with previous tick
         if (batchPercent != lastBatchPercent) {
-            lg.info(String.format("Batch progress changed: %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
+//            lg.info(String.format("Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
             lastBatchPercent = batchPercent;
+            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
         } else {
-            lg.info(String.format("Batch progress unchanged at %.6f%%", lastBatchPercent));
+//            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
+            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
         }
     }
 

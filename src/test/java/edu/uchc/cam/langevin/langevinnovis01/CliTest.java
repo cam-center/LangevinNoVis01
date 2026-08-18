@@ -3,6 +3,7 @@ package edu.uchc.cam.langevin.langevinnovis01;
 import edu.uchc.cam.langevin.cli.CliMain;
 import edu.uchc.cam.langevin.helpernovis.FileMapper;
 import edu.uchc.cam.langevin.helpernovis.SolverResultSet;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
@@ -275,6 +276,13 @@ public class CliTest {
     }
 
     // ========================= WATCHDOG TESTS ==========================
+    /*
+     * Two simple early tests in one:
+     * - verify that we deal properly with missing required argument (should fail early with picocli
+     *   returning error code 2)
+     * - verify that we deal properly with a missing model file (should fail early with error code 1 during
+     *   the execution of WatchCommand.call())
+     */
     @Test
     public void testFailingWatchdogEarly() throws Exception {
 
@@ -282,27 +290,21 @@ public class CliTest {
         Path tempDirectory = Files.createTempDirectory("test_watchdog_fail");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
 
-        //
-        // ------------------------------ first test, missing required parameter ------------------------------
-        //
-        // we are missing a required parameter, picocli should return an error code 2
+        // first test: we are missing a required parameter, picocli should return an error code 2
         // Build CLI args for watchdog
         String[] args = {
                 "watchdog",
                 modelFile.toString(),
                 "3",
-                                            // !!! required --watchdogTick missing
-                "--watchdog-timeout", "20",
-                "--vc-print-status"
+                                            // !!! required --watchdog-tick missing
+                "--watchdog-timeout", "20"
         };
         CommandLine cmd = new CommandLine(new CliMain());
         int exitCode = cmd.execute(args);
         // The watchdog should fail early, even before WatchCommand.call() because the required --watchdogTick missing
         assertEquals(2, exitCode, "Watchdog should fail early with code 2 when required parameter is missing");
 
-        //
-        // ------------------------------ second test, model file does not exist ------------------------------
-        //
+        // second test, model file does not exist
         // IMPORTANT: Do NOT create the model file yet
         assertFalse(modelFile.toFile().exists(), "Model file should NOT exist for this failure test");
         // Build CLI args for watchdog
@@ -311,8 +313,7 @@ public class CliTest {
                 modelFile.toString(),       // !!! nonexistent model file
                 "3",                        // valid number of runs
                 "--watchdog-tick", "3",     // check every *** seconds
-                "--watchdog-timeout", "20", // give up after *** seconds if no logfile appears at all
-                "--vc-print-status"         // we'll test this too, later
+                "--watchdog-timeout", "20"  // give up after *** seconds if no logfile appears at all
         };
 
         CommandLine cmd2 = new CommandLine(new CliMain());
@@ -321,7 +322,12 @@ public class CliTest {
         assertEquals(1, exitCode2, "Watchdog should fail early when model file is missing");
     }
 
-    // -----------------------------------------------------------------------
+    /*
+     * Exercising the --watchdog-timeout argument:
+     * For the simple case where simulation 0 never starts, so it never creates a log file
+     * There is no stale log file from a previous run of simulation 0
+     * The watchdog should time out and return non-zero
+     */
     @Test
     public void testWatchdogMissingLogs() throws Exception {
 
@@ -337,8 +343,7 @@ public class CliTest {
                 modelFile.toString(),
                 "3",                        // numRuns
                 "--watchdog-tick", "3",     // check every *** seconds
-                "--watchdog-timeout", "10", // give up after *** seconds if no logfile appears at all
-                "--vc-print-status"
+                "--watchdog-timeout", "10"  // give up after *** seconds if no logfile appears at all
         };
 
         CommandLine cmd = new CommandLine(new CliMain());
@@ -348,6 +353,14 @@ public class CliTest {
         assertNotEquals(0, exitCode, "Watchdog should fail due to missing logs");
     }
 
+    /*
+     * Exercising the --watchdog-timeout argument differently:
+     * There is only a stale log file for run 0, which means simulation 0 never starts for the current batch run
+     * Normally it should start rather quickly and create a fresh log file
+     * Nevertheless, we'll give it a generous timeout in production code to account for the fact that slurm may need
+     * to delay it a lot if the node is too busy
+     * The watchdog will time out because something is wrong
+     */
     @Test
     public void testWatchdogStaleLog() throws Exception {
 
@@ -373,8 +386,7 @@ public class CliTest {
                 modelFile.toString(),
                 "3",                        // numRuns
                 "--watchdog-tick", "3",     // check every 3 seconds
-                "--watchdog-timeout", "10", // give up after 10 seconds
-                "--vc-print-status"
+                "--watchdog-timeout", "10"  // give up after 10 seconds
         };
 
         CommandLine cmd = new CommandLine(new CliMain());
@@ -384,7 +396,12 @@ public class CliTest {
         assertNotEquals(0, exitCode, "Watchdog should fail due to stale log file being ignored");
     }
 
-    // -----------------------------------------------------------------------
+    /*
+     * There is a stale log file for run 0 but a fresh log file will be created for run 0 after a delay
+     * Obviously the delat has to be shorter than the timeout
+     * The watchdog should detect the fresh log file and enter the main infinite loop and start recording progress
+     * We will eventually interrupt the watchdog to stop the test
+     */
     @Test
     public void testWatchdogEntersProgressLoop() throws Exception {
 
@@ -409,17 +426,16 @@ public class CliTest {
         long now = System.currentTimeMillis();
         staleLog.setLastModified(now - 10000);
 
-        // Build CLI args
+        // Build CLI args, note no --vc-print-status and no --vc-send_status-config , uses VCellMessagingNoop()
         String[] args = {
                 "watchdog",
                 modelFile.toString(),
                 "3",                        // numRuns
                 "--watchdog-tick", "2",     // check every second
-                "--watchdog-timeout", "10",  // timeout for first loop (won't be used)
-                "--vc-print-status"
+                "--watchdog-timeout", "10"  // timeout for first loop (won't be used)
         };
 
-        // Run watchdog in a separate thread so we can kill it
+        // Run watchdog in a separate thread so that we can kill it
         CommandLine cmd = new CommandLine(new CliMain());
         Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
         watchdogThread.start();
@@ -443,7 +459,13 @@ public class CliTest {
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
     }
 
-    // -----------------------------------------------------------------------
+    /*
+     * Here we really exercise the log file parser and the algorithm that detects and computes progress
+     * We should improve the test by capturing the stdout and really checking the outputs against expected values
+     * or having a logfile created in the watchdog and checking that
+     * or at least checking that the progress is increasing over time
+     * If VcellMessagingLocal works, we should see something like [[[progress:3.0%]]] or [[[alive]]]
+     */
     @Test
     public void testWatchdogMonitorsProgress() throws Exception {
 
@@ -453,14 +475,87 @@ public class CliTest {
         // Create valid model file
         Files.writeString(modelFile, inputFileContents);
 
-        // Build CLI args
+        // Build CLI args, note --vc-print-status", uses VCellMessagingLocal()
         String[] args = {
                 "watchdog",
                 modelFile.toString(),
                 "3",                        // numRuns
                 "--watchdog-tick", "3",     // check every *** seconds
-                "--watchdog-timeout", "20",  // timeout in seconds for first loop (won't be used)
-                "--vc-print-status"
+                "--watchdog-timeout", "20", // timeout in seconds for first loop (won't be used)
+                "--vc-print-status"         // uses: vcellMessaging = new VCellMessagingLocal();
+        };
+
+        // Run watchdog in a separate thread so we can kill it
+        CommandLine cmd = new CommandLine(new CliMain());
+        Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
+        watchdogThread.start();
+
+        // Create multiple log files and keep appending percentage growth
+        Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 3000, 7000);
+        Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 9000, 8000);
+        Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 15000, 9000);
+        freshLog0Thread.start();
+        freshLog1Thread.start();
+        freshLog2Thread.start();
+
+        // Let watchdog run long enough to detect the fresh log and enter the infinite loop
+        Thread.sleep(30000);
+
+        // At this point, watchdog should be inside the second loop
+        assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
+
+        // we run some more, then kill the watchdog thread
+        Thread.sleep(30000);
+        watchdogThread.interrupt();
+
+        // Give it a moment to stop
+        Thread.sleep(500);
+
+        assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+    }
+
+    /*
+     * Here we exercise sending WorkerEvent via REST to ActiveMQ server
+     * Obviously it's not going to work as is because we don't have a real ActiveMQ server running
+     * We'll get exceptions:
+     *    java.net.ConnectException
+	 *       at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:573)
+	 *       at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:123)
+	 *       at org.vcell.messaging.VCellMessagingRest.sendWorkerEvent(VCellMessagingRest.java:165)
+     *       ...
+     *       Exception sending WorkerEvent via REST to ActiveMQ server: null
+     */
+    @Disabled       // exclude this from any automated run including github; this should be run manually with
+                    // a real ActiveMQ server running and the config file pointing to it
+    @Test
+    public void testWatchdogMessaging() throws Exception {
+
+        Path tempDirectory = Files.createTempDirectory("test_watchdog_monitors_progress");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        // Create valid model file
+        Files.writeString(modelFile, inputFileContents);
+
+        // Create a fake VCell messaging config file
+        Path configFile = tempDirectory.resolve("vc_config.properties");
+        Files.writeString(configFile,
+                "broker_host=localhost\n" +
+                        "broker_port=8165\n" +
+                        "broker_username=msg_user\n" +
+                        "broker_password=msg_pswd\n" +
+                        "vc_username=vcell_user\n" +
+                        "simKey=123456789\n" +
+                        "taskID=0\n" +
+                        "jobIndex=0\n");
+
+        // Build CLI args, note the --vc-send-status-config option, uses VCellMessagingRest(config)
+        String[] args = {
+                "watchdog",
+                modelFile.toString(),
+                "3",                        // numRuns
+                "--vc-send-status-config", configFile.toString(),   // uses: vcellMessaging = new VCellMessagingRest(config);
+                "--watchdog-tick", "3",     // check every *** seconds
+                "--watchdog-timeout", "20"  // timeout in seconds for first loop (won't be used)
         };
 
         // Run watchdog in a separate thread so we can kill it
@@ -492,107 +587,41 @@ public class CliTest {
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
     }
 
+    // -------------- Utility functions -------------------------------------
+    private Thread createLogWriterThread(
+            Path simulationFolder,
+            String simulationName,
+            int logIndex,
+            int numEntries,
+            long initialDelayMillis,    // Initial delay before creating the fresh log file
+            long writeIntervalMillis
+    ) {
+        return new Thread(() -> {
+            try {
+                // Build the log file path for this index
+                Path logFile = simulationFolder.resolve(simulationName + logIndex + ".log");
 
-    // -----------------------------------------------------------------------
-//    @Test
-//    public void testWatchdogCommand() throws Exception {
-//
-//        // Create temp directory for the test batch
-//        Path tempDirectory = Files.createTempDirectory("test_watchdog");
-//        Path modelFile = tempDirectory.resolve("sim.langevinInput");
-//
-//        // Write a minimal valid model file
-//        Files.writeString(modelFile, inputFileContents);
-//
-//        // Create fake log files for 3 runs
-//        int numRuns = 3;
-//        for (int i = 0; i < numRuns; i++) {
-//            Path logFile = tempDirectory.resolve("SimID_sim_0_" + i + ".log");
-//            Files.writeString(logFile,
-//                    "STEP 100/1000\n" +
-//                            "PROGRESS: 0.10\n");
-//            assertTrue(logFile.toFile().exists(), "Expected fake log file to exist");
-//        }
-//
-//        // Create a fake VCell messaging config file
-//        Path configFile = tempDirectory.resolve("vc_config.properties");
-//        Files.writeString(configFile,
-//                "broker_host=localhost\n" +
-//                        "broker_port=8165\n" +
-//                        "broker_username=msg_user\n" +
-//                        "broker_password=msg_pswd\n" +
-//                        "vc_username=vcell_user\n" +
-//                        "simKey=12334483837\n" +
-//                        "taskID=0\n" +
-//                        "jobIndex=0\n");
-//
-//        // Build CLI args for watchdog
-//        String[] args = {
-//                "watchdog",
-//                modelFile.toString(),
-//                Integer.toString(numRuns),
-//                "--vc-send-status-config", configFile.toString(),
-//                "--watchdog-tick", "2",     // check every ***
-//                "--watchdog-timeout", "10",  // timeout for first loop
-//                "--vc-print-status"
-//        };
-//
-//        // Execute CLI
-//        CommandLine cmd = new CommandLine(new CliMain());
-//        int exitCode = cmd.execute(args);
-//
-//        // Assertions
-//        assertEquals(0, exitCode, "Watchdog command should execute successfully");
-//
-//        // The watchdog should have created a Global object and scanned logs
-//        // We can check that the watchdog printed something to stdout
-//        // (if you want stronger assertions, capture stdout with SystemLambda)
-//        assertTrue(modelFile.toFile().exists(), "Model file should still exist");
-//
-//        // Optional: verify that the watchdog recognized the simulation folder
-//        File simFolder = modelFile.getParent().toFile();
-//        assertTrue(simFolder.exists(), "Simulation folder should exist");
-//
-//        // Optional: verify progress markers were parsed
-//        // (You can add a public getter in Watchdog to expose parsed progress)
-//    }
+                // Initial delay before creating the fresh log file
+                // this simulates the short time between the moment we launch the watchdog and the moment
+                // the simulation starts writing to the log file
+                Thread.sleep(initialDelayMillis);
 
-// -------------- Utility functions -------------------------------------
-private Thread createLogWriterThread(
-        Path simulationFolder,
-        String simulationName,
-        int logIndex,
-        int numEntries,
-        long initialDelayMillis,    // Initial delay before creating the fresh log file
-        long writeIntervalMillis
-) {
-    return new Thread(() -> {
-        try {
-            // Build the log file path for this index
-            Path logFile = simulationFolder.resolve(simulationName + logIndex + ".log");
+                // Rewrite file to make it fresh
+                Files.writeString(logFile, "");
+                logFile.toFile().setLastModified(System.currentTimeMillis());
 
-            // Initial delay before creating the fresh log file
-            // this simulates the short time between the moment we launch the watchdog and the moment
-            // the simulation starts writing to the log file
-            Thread.sleep(initialDelayMillis);
+                // Now write real progress steps at the specified interval
+                for (int i = 1; i <= numEntries; i++) {
+                    Thread.sleep(writeIntervalMillis);
+                    String line = "Simulation " + i + "% complete. Elapsed time: " + (i * (writeIntervalMillis / 1000.0)) + " sec.\n";
+                    System.out.println("    log " + logIndex + "++");   // ... + line.trim()
+                    Files.writeString(logFile, line, StandardOpenOption.APPEND);
+                }
 
-            // Rewrite file to make it fresh
-            Files.writeString(logFile, "");
-            logFile.toFile().setLastModified(System.currentTimeMillis());
-
-            // Now write real progress steps at the specified interval
-            for (int i = 1; i <= numEntries; i++) {
-                Thread.sleep(writeIntervalMillis);
-                String line = "Simulation " + i + "% complete. Elapsed time: " + (i * (writeIntervalMillis / 1000.0)) + " sec.\n";
-                System.out.println("    log " + logIndex + "++");   // ... + line.trim()
-                Files.writeString(logFile, line, StandardOpenOption.APPEND);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    });
-}
-
+        });
+    }
 
 }
