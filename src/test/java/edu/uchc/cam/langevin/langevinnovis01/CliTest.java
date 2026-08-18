@@ -290,6 +290,8 @@ public class CliTest {
         Path tempDirectory = Files.createTempDirectory("test_watchdog_fail");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
 
+        try {
+
         // first test: we are missing a required parameter, picocli should return an error code 2
         // Build CLI args for watchdog
         String[] args = {
@@ -320,6 +322,11 @@ public class CliTest {
         int exitCode2 = cmd2.execute(args2);
         // The watchdog should fail early, during the execution of WatchCommand.call() because the model file does not exist
         assertEquals(1, exitCode2, "Watchdog should fail early when model file is missing");
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+
     }
 
     /*
@@ -333,6 +340,8 @@ public class CliTest {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_missing_logs");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        try {
 
         // Create the model file (valid)
         Files.writeString(modelFile, inputFileContents);
@@ -351,6 +360,10 @@ public class CliTest {
 
         // Watchdog should time out and return non-zero
         assertNotEquals(0, exitCode, "Watchdog should fail due to missing logs");
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
     }
 
     /*
@@ -366,6 +379,8 @@ public class CliTest {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_stale_log");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        try {
 
         // Create the model file (valid)
         Files.writeString(modelFile, inputFileContents);
@@ -394,6 +409,10 @@ public class CliTest {
 
         // Watchdog should time out because the log file is stale
         assertNotEquals(0, exitCode, "Watchdog should fail due to stale log file being ignored");
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
     }
 
     /*
@@ -401,12 +420,19 @@ public class CliTest {
      * Obviously the delat has to be shorter than the timeout
      * The watchdog should detect the fresh log file and enter the main infinite loop and start recording progress
      * We will eventually interrupt the watchdog to stop the test
+     * Note that no --vc-print-status or --vc-send_status-config is used, so the watchdog will use VCellMessagingNoop()
+     * and not send any progress messages, like [[[progress:3.0%]]] or [[[alive]]] in the
+     * output, we will only see lg.info messages if not commented out in the code (as they will be eventually)
+     * The only thing we'll see is the simulation progress messages in the log file, and logger messages from the
+     * thread simulating progress, like "log 0++"
      */
     @Test
     public void testWatchdogEntersProgressLoop() throws Exception {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_progress_loop");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        try {
 
         // Create valid model file
         Files.writeString(modelFile, inputFileContents);
@@ -457,6 +483,10 @@ public class CliTest {
         Thread.sleep(500);
 
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
     }
 
     /*
@@ -471,6 +501,8 @@ public class CliTest {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_monitors_progress");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        try {
 
         // Create valid model file
         Files.writeString(modelFile, inputFileContents);
@@ -512,6 +544,10 @@ public class CliTest {
         Thread.sleep(500);
 
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
     }
 
     /*
@@ -532,6 +568,8 @@ public class CliTest {
 
         Path tempDirectory = Files.createTempDirectory("test_watchdog_monitors_progress");
         Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        try {
 
         // Create valid model file
         Files.writeString(modelFile, inputFileContents);
@@ -585,14 +623,20 @@ public class CliTest {
         Thread.sleep(500);
 
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
     }
 
-    // -------------- Utility functions -------------------------------------
+    //
+    // ---------------------------- Utility functions -------------------------------------
+    //
     private Thread createLogWriterThread(
             Path simulationFolder,
-            String simulationName,
-            int logIndex,
-            int numEntries,
+            String simulationName,      // ex: SimID_123456789_0_
+            int logIndex,               // run index that we're simulating: 0, 1, 2...
+            int numEntries,             // number of progress entries to write, normally 100 but we can stop early
             long initialDelayMillis,    // Initial delay before creating the fresh log file
             long writeIntervalMillis
     ) {
