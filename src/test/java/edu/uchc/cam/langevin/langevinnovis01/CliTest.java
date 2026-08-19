@@ -562,17 +562,17 @@ public class CliTest {
         String sysOutText = baos.toString();
         System.err.println("Captured System.out:\n" + sysOutText);
 
-        assertTrue(sysOutText.contains("Watchdog"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("started"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("analyzing"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("folder"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("entering doWork"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("monitoring loop"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("loop tick"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("progress unchanged"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("[[[progress:0.0%]]]"), "Expected progress output missing");     // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(...
-        assertTrue(sysOutText.contains("progress changed"), "Expected progress output missing");
-        assertTrue(sysOutText.contains("interrupted"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("Watchdog"), "1. Expected progress output missing");
+        assertTrue(sysOutText.contains("started"), "2. Expected progress output missing");
+        assertTrue(sysOutText.contains("analyzing"), "3. Expected progress output missing");
+        assertTrue(sysOutText.contains("folder"), "4. Expected progress output missing");
+        assertTrue(sysOutText.contains("entering doWork"), "5. Expected progress output missing");
+        assertTrue(sysOutText.contains("monitoring loop"), "6. Expected progress output missing");
+        assertTrue(sysOutText.contains("loop tick"), "7. Expected progress output missing");
+        assertTrue(sysOutText.contains("progress unchanged"), "8. Expected progress output missing");
+        assertTrue(sysOutText.contains("[[[progress:0.0%]]]"), "9. Expected progress output missing");     // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(...
+        assertTrue(sysOutText.contains("progress changed"), "10. Expected progress output missing");
+        assertTrue(sysOutText.contains("interrupted"), "11. Expected progress output missing");
 
         } finally {
             deleteDirectory(tempDirectory.toFile());
