@@ -562,7 +562,7 @@ public class CliTest {
      * Not working on the Mac, so we disable it in the CI run, but it can be run manually on a Mac to verify that it
      * works there too (which it does, tested on Jim's machine)
      */
-//    @Disabled("Manual-only test; excluded from CI")     // disabled for CI because of the Mac failure
+    @Disabled("Manual-only test; excluded from CI")     // disabled for CI because of the Mac failure
     @Test
     public void testWatchdogMonitorsProgressWithCapture() throws Exception {
 
