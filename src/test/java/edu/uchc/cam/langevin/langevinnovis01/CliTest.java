@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -333,7 +333,7 @@ public class CliTest {
      * Exercising the --watchdog-timeout argument:
      * For the simple case where simulation 0 never starts, so it never creates a log file
      * There is no stale log file from a previous run of simulation 0
-     * The watchdog should time out and return non-zero
+     * Expected behavior is that the watchdog will time out and return non-zero
      */
     @Test
     public void testWatchdogMissingLogs() throws Exception {
@@ -372,7 +372,7 @@ public class CliTest {
      * Normally it should start rather quickly and create a fresh log file
      * Nevertheless, we'll give it a generous timeout in production code to account for the fact that slurm may need
      * to delay it a lot if the node is too busy
-     * The watchdog will time out because something is wrong
+     * Expected behavior is that the watchdog will time out because something is wrong
      */
     @Test
     public void testWatchdogStaleLog() throws Exception {
@@ -426,6 +426,10 @@ public class CliTest {
      * The only thing we'll see is the simulation progress messages in the log file, and logger messages from the
      * thread simulating progress, like "log 0++"
      */
+    @Disabled("Manual-only test; excluded from CI")  // excluded for CI, as it takes time and we only want to visually
+                                                     // verify some partial functionality. The next test is a complete
+                                                     // exercise of all the functionality and that's the one
+                                                     // that should be used for CI
     @Test
     public void testWatchdogEntersProgressLoop() throws Exception {
 
@@ -491,10 +495,11 @@ public class CliTest {
 
     /*
      * Here we really exercise the log file parser and the algorithm that detects and computes progress
-     * We should improve the test by capturing the stdout and really checking the outputs against expected values
-     * or having a logfile created in the watchdog and checking that
-     * or at least checking that the progress is increasing over time
+     * We are capturing the stdout and check the outputs against expected values
+     * Nothing will show at the console since we are redirecting System.out to a ByteArrayOutputStream.
      * If VcellMessagingLocal works, we should see something like [[[progress:3.0%]]] or [[[alive]]]
+     * Comprehensive assertions are made to verify that the watchdog is doing what it should be doing,
+     * including detecting progress changes and messaging.
      */
     @Test
     public void testWatchdogMonitorsProgress() throws Exception {
@@ -517,33 +522,57 @@ public class CliTest {
                 "--vc-print-status"         // uses: vcellMessaging = new VCellMessagingLocal();
         };
 
-        // Run watchdog in a separate thread so we can kill it
+        // Redirect System.out so that we can capture watchdog output
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(baos);
+        System.setOut(ps);                      // redirect stdout to this
+        StringWriter stdout = new StringWriter();
+
         CommandLine cmd = new CommandLine(new CliMain());
+        cmd.setOut(new PrintWriter(stdout));
+
+        // Run watchdog in a separate thread so we can kill it
         Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
         watchdogThread.start();
 
         // Create multiple log files and keep appending percentage growth
         Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 3000, 7000);
-        Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 9000, 8000);
-        Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 15000, 9000);
+        Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 7000, 8000);
+        Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 11000, 9000);
         freshLog0Thread.start();
         freshLog1Thread.start();
         freshLog2Thread.start();
 
         // Let watchdog run long enough to detect the fresh log and enter the infinite loop
-        Thread.sleep(30000);
+        Thread.sleep(20000);
 
         // At this point, watchdog should be inside the second loop
         assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
 
         // we run some more, then kill the watchdog thread
-        Thread.sleep(30000);
+        Thread.sleep(20000);
         watchdogThread.interrupt();
 
         // Give it a moment to stop
         Thread.sleep(500);
 
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+
+        // let's see what the cat brought in
+        String sysOutText = baos.toString();
+        System.err.println("Captured System.out:\n" + sysOutText);
+
+        assertTrue(sysOutText.contains("Watchdog"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("started"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("analyzing"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("folder"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("entering doWork"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("monitoring loop"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("loop tick"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("progress unchanged"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("[[[progress:0.0%]]]"), "Expected progress output missing");     // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(...
+        assertTrue(sysOutText.contains("progress changed"), "Expected progress output missing");
+        assertTrue(sysOutText.contains("interrupted"), "Expected progress output missing");
 
         } finally {
             deleteDirectory(tempDirectory.toFile());
@@ -658,7 +687,8 @@ public class CliTest {
                 for (int i = 1; i <= numEntries; i++) {
                     Thread.sleep(writeIntervalMillis);
                     String line = "Simulation " + i + "% complete. Elapsed time: " + (i * (writeIntervalMillis / 1000.0)) + " sec.\n";
-                    System.out.println("    log " + logIndex + "++");   // ... + line.trim()
+                    System.out.println("    log " + logIndex + " at " + i + "%");   // ... + line.trim()
+                    System.err.println("    log " + logIndex + ": " + line.trim());
                     Files.writeString(logFile, line, StandardOpenOption.APPEND);
                 }
 

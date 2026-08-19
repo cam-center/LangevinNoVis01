@@ -158,7 +158,7 @@ public class Watchdog {
             long elapsed = (now - lastTick) / 1000L;
 
             // Log that we are alive inside the second loop
-//            lg.info("Watchdog progress loop tick — elapsed " + elapsed + " seconds since last tick");
+            lg.info("Watchdog progress loop tick — elapsed " + elapsed + " seconds since last tick");
 
             // Reset tick timer
             lastTick = now;
@@ -229,11 +229,11 @@ public class Watchdog {
 
         // Compare with previous tick
         if (batchPercent != lastBatchPercent) {
-//            lg.info(String.format("Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
+            lg.info(String.format("Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
             lastBatchPercent = batchPercent;
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
         } else {
-//            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
+            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
             vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
         }
     }
