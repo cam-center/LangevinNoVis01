@@ -495,11 +495,8 @@ public class CliTest {
 
     /*
      * Here we really exercise the log file parser and the algorithm that detects and computes progress
-     * We are capturing the stdout and check the outputs against expected values
-     * Nothing will show at the console since we are redirecting System.out to a ByteArrayOutputStream.
      * If VcellMessagingLocal works, we should see something like [[[progress:3.0%]]] or [[[alive]]]
-     * Comprehensive assertions are made to verify that the watchdog is doing what it should be doing,
-     * including detecting progress changes and messaging.
+     * A few assertions are made to verify that the watchdog is working at all.
      */
     @Test
     public void testWatchdogMonitorsProgress() throws Exception {
@@ -522,14 +519,7 @@ public class CliTest {
                 "--vc-print-status"         // uses: vcellMessaging = new VCellMessagingLocal();
         };
 
-        // Redirect System.out so that we can capture watchdog output
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PrintStream ps = new PrintStream(baos);
-        System.setOut(ps);                      // redirect stdout to this
-        StringWriter stdout = new StringWriter();
-
         CommandLine cmd = new CommandLine(new CliMain());
-        cmd.setOut(new PrintWriter(stdout));
 
         // Run watchdog in a separate thread so we can kill it
         Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
@@ -558,21 +548,93 @@ public class CliTest {
 
         assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
 
-        // let's see what the cat brought in
-        String sysOutText = baos.toString();
-        System.err.println("Captured System.out:\n" + sysOutText);
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
 
-        assertTrue(sysOutText.contains("Watchdog"), "1. Expected progress output missing");
-        assertTrue(sysOutText.contains("started"), "2. Expected progress output missing");
-        assertTrue(sysOutText.contains("analyzing"), "3. Expected progress output missing");
-        assertTrue(sysOutText.contains("folder"), "4. Expected progress output missing");
-        assertTrue(sysOutText.contains("entering doWork"), "5. Expected progress output missing");
-        assertTrue(sysOutText.contains("monitoring loop"), "6. Expected progress output missing");
-        assertTrue(sysOutText.contains("loop tick"), "7. Expected progress output missing");
-        assertTrue(sysOutText.contains("progress unchanged"), "8. Expected progress output missing");
-        assertTrue(sysOutText.contains("[[[progress:0.0%]]]"), "9. Expected progress output missing");     // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(...
-        assertTrue(sysOutText.contains("progress changed"), "10. Expected progress output missing");
-        assertTrue(sysOutText.contains("interrupted"), "11. Expected progress output missing");
+    /*
+     * Same as above but we are capturing the stdout and check the outputs against expected values
+     * Nothing will show at the console since we are redirecting System.out to a ByteArrayOutputStream.
+     * If VcellMessagingLocal works, we should see something like [[[progress:3.0%]]] or [[[alive]]]
+     * Comprehensive assertions are made to verify that the watchdog is doing what it should be doing,
+     * including detecting progress changes and messaging.
+     * Not working on the Mac, so we disable it in the CI run, but it can be run manually on a Mac to verify that it
+     * works there too (which it does, tested on Jim's machine)
+     */
+//    @Disabled("Manual-only test; excluded from CI")     // disabled for CI because of the Mac failure
+    @Test
+    public void testWatchdogMonitorsProgressWithCapture() throws Exception {
+
+        Path tempDirectory = Files.createTempDirectory("test_watchdog_monitors_progress");
+        Path modelFile = tempDirectory.resolve("SimID_123456789_0_.langevinInput");
+
+        try {
+
+            // Create valid model file
+            Files.writeString(modelFile, inputFileContents);
+
+            // Build CLI args, note --vc-print-status", uses VCellMessagingLocal()
+            String[] args = {
+                    "watchdog",
+                    modelFile.toString(),
+                    "3",                        // numRuns
+                    "--watchdog-tick", "3",     // check every *** seconds
+                    "--watchdog-timeout", "20", // timeout in seconds for first loop (won't be used)
+                    "--vc-print-status"         // uses: vcellMessaging = new VCellMessagingLocal();
+            };
+
+            // Redirect System.out so that we can capture watchdog output
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PrintStream ps = new PrintStream(baos, true);
+            System.setOut(ps);                      // redirect stdout to this
+            StringWriter stdout = new StringWriter();
+
+            CommandLine cmd = new CommandLine(new CliMain());
+            cmd.setOut(new PrintWriter(stdout));
+
+            // Run watchdog in a separate thread so we can kill it
+            Thread watchdogThread = new Thread(() -> {cmd.execute(args); });
+            watchdogThread.start();
+
+            // Create multiple log files and keep appending percentage growth
+            Thread freshLog0Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 0, 100, 3000, 7000);
+            Thread freshLog1Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 1, 100, 7000, 8000);
+            Thread freshLog2Thread = createLogWriterThread(tempDirectory, "SimID_123456789_0_", 2, 7, 11000, 9000);
+            freshLog0Thread.start();
+            freshLog1Thread.start();
+            freshLog2Thread.start();
+
+            // Let watchdog run long enough to detect the fresh log and enter the infinite loop
+            Thread.sleep(20000);
+
+            // At this point, watchdog should be inside the second loop
+            assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
+
+            // we run some more, then kill the watchdog thread
+            Thread.sleep(20000);
+            watchdogThread.interrupt();
+
+            // Give it a moment to stop
+            Thread.sleep(500);
+
+            assertFalse(watchdogThread.isAlive(), "Watchdog thread should have been interrupted and stopped");
+
+            // let's see what the cat brought in
+            String sysOutText = baos.toString();
+            System.err.println("Captured System.out:\n" + sysOutText);
+
+            assertTrue(sysOutText.contains("Watchdog"), "1. Expected progress output missing");
+            assertTrue(sysOutText.contains("started"), "2. Expected progress output missing");
+            assertTrue(sysOutText.contains("analyzing"), "3. Expected progress output missing");
+            assertTrue(sysOutText.contains("folder"), "4. Expected progress output missing");
+            assertTrue(sysOutText.contains("entering doWork"), "5. Expected progress output missing");
+            assertTrue(sysOutText.contains("monitoring loop"), "6. Expected progress output missing");
+            assertTrue(sysOutText.contains("loop tick"), "7. Expected progress output missing");
+            assertTrue(sysOutText.contains("progress unchanged"), "8. Expected progress output missing");
+            assertTrue(sysOutText.contains("[[[progress:0.0%]]]"), "9. Expected progress output missing");     // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(...
+            assertTrue(sysOutText.contains("progress changed"), "10. Expected progress output missing");
+            assertTrue(sysOutText.contains("interrupted"), "11. Expected progress output missing");
 
         } finally {
             deleteDirectory(tempDirectory.toFile());
