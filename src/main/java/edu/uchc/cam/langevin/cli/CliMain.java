@@ -11,7 +11,8 @@ import picocli.CommandLine;
         description = "Langevin solver and utilities.",
         subcommands = {
                 RunCommand.class,
-                PostCommand.class
+                PostCommand.class,
+                WatchCommand.class
         })
 public class CliMain {
     public static void main(String[] args) {

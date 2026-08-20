@@ -33,6 +33,9 @@ public class VCellMessagingLocal implements VCellMessaging {
                     last_progress_event_timestamp_ms = timestamp_ms;
                 }
                 break;
+            case JOB_WORKER_ALIVE:
+                stdout.println("[[[alive]]]");
+                break;
             case JOB_STARTING:
                 stdout.println(event.eventMessage());
                 break;

@@ -1081,6 +1081,15 @@ public class MySystem {
         lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
 
+        // CREATE LOG FILE IMMEDIATELY AT STARTUP
+        if (useOutputFile) {
+            try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), false))) {
+                p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
+            } catch (IOException ioe) {
+                lg.warn("Could not create initial log file: " + g.getOutputFile(), ioe);
+            }
+        }
+
         double nextRealTime = totalTime/100;
         int percentComplete = 0;
         double nextDataTime = dtdata;
