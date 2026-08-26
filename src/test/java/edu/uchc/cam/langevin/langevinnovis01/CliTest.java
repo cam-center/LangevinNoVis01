@@ -750,7 +750,7 @@ public class CliTest {
                     Thread.sleep(writeIntervalMillis);
                     String line = "Simulation " + i + "% complete. Elapsed time: " + (i * (writeIntervalMillis / 1000.0)) + " sec.\n";
                     System.out.println("    log " + logIndex + " at " + i + "%");   // ... + line.trim()
-                    System.err.println("    log " + logIndex + ": " + line.trim());
+//                    System.err.println("    log " + logIndex + ": " + line.trim());
                     Files.writeString(logFile, line, StandardOpenOption.APPEND);
                 }
 

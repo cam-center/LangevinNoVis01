@@ -98,12 +98,14 @@ public class MySystem {
     private final int npartz;
 
     // Temporal system information.
-    private final double totalTime;
+    private final double totalTime;     // simulation total time (time between begin time and end time)
     private final double dt;            // simulation time step default 1.0E-8
     private final double dtspring;      // spring interval default 1.0E-9
     private final double dtdata;        // data output interval (when we update the counters) default 1.0E-4
     private final double dtimage;       // image output interval default 1.0E-4
+
     // Current system time
+    // starts at 0 and ends at totalTime, grows in increments of dt
     private double time = 0;
 
     // File information
@@ -133,7 +135,7 @@ public class MySystem {
     private final ArrayList<Partition> activePartitions = new ArrayList<>();
 
     // Time we started the simulation and time it finished
-    private long startTime;
+    private long startTime; //  real system time: System.currentTimeMillis();
     private long stopTime;
 
     private final VCellMessaging vcellMessaging;
@@ -1090,12 +1092,46 @@ public class MySystem {
             }
         }
 
+        /*
+         * Meaningful simulation times, data points, image points, progress updates / logging
+         */
         double nextRealTime = totalTime/100;
         int percentComplete = 0;
         double nextDataTime = dtdata;
         double nextImageTime = dtimage;
-
         int relaxationSteps = (int)(dt/dtspring);
+
+        /*
+         * ------------------------------------------------------------------------------
+         * Special statistics during multiple runs, will be only computed for run index 1
+         * time between iterations, min / max / running average
+         * running estimation of ETA, remaining runtime, total runtime, confidence bounds
+         */
+        long iterCount = 0;
+        long totalIterTime = 0;   // sum of all iteration durations (ns)
+        long minIterTime = Long.MAX_VALUE;
+        long maxIterTime = Long.MIN_VALUE;
+        double meanIterTime = 0.0;
+        double m2 = 0.0; // for variance (Welford)
+        int totalSteps = (int)(totalTime / dt);
+
+        final int[] etaScheduleSeconds = {      // Real-time ETA schedule (seconds)
+                1,2,3,4,5,6,7,8,9,10,
+                20,30,40,50,60
+        };
+        int etaScheduleIndex = 0;
+        long nextEtaTimeMs = startTime + etaScheduleSeconds[0] * 1000L; // First ETA trigger time
+        final long etaLoggingCutoffMs = startTime + 3600_000L;          // Stop ETA logging after 1 hour
+        // because of the fact that we stop computing ETA after 1 hour, we may be seriously off for very long
+        // simulations. We will log our latest estimate separately and we'll compare that with the effective
+        // duration we get at the very end. These vars are where we store what we need.
+        long lastEtaTimeMs = -1;
+        long lastEtaTotalNs = -1;
+        long lastEtaRemainingNs = -1;
+        long lastEtaLowNs = -1;
+        long lastEtaHighNs = -1;
+        double lastEtaProgress = -1.0;
+        // ------------------------------------------------------------------------------
 
         // GET THE DATA AT THE ZERO TIME POINT
         writePositions();
@@ -1112,36 +1148,35 @@ public class MySystem {
         sitePropertyCounter.countProperties();
 //        locationTracker.initializeMaps();
 //        locationTracker.trackPositions();
-        // We go ever so slightly over the last time point to make sure we
-        // get data at the last time point.
+
+        lg.info("Number of steps: " + totalSteps);
+        lg.info("Spring relaxation steps: " + relaxationSteps);
+
+        // We go ever so slightly over the last time point to make sure we get data at the last time point.
         while(time < totalTime + dt){
-            // Look to see if we should output data
+            // lg.info("Simulation time: " + time + " of " + totalTime);    // this is too much output
+
+            // ----- Look to see if we should output data
             if(time >= nextDataTime){
                 moleculeCounter.countMolecules();
-                // moleculeCounter.writePartialData(dataFolder);
-
                 stateCounter.countStates();
-                // stateCounter.writePartialData(dataFolder);
-
                 bondCounter.countBonds();
-                // bondCounter.writePartialData(dataFolder);
                 if(countingClusters){
                     clusterCounter.countClusters();
                     clusterCounter.writeClusters(dataFolder);
                 }
                 sitePropertyCounter.countProperties();
-//                locationTracker.trackPositions();
-
                 reactionCounter.initDatapoint();    // we update in real time as reactions happen
-
                 nextDataTime += dtdata;
             }
-            // Look to see if we should output an image
+
+            // ----- Look to see if we should output an image
             if(time >= nextImageTime){
                 writePositions();
                 nextImageTime += dtimage;
             }
-            // Look to see if we should give the user an update
+
+            // ----- Look to see if we should give the user an update
             if(time >= nextRealTime){
                 long now = System.currentTimeMillis();
                 percentComplete++;
@@ -1159,19 +1194,105 @@ public class MySystem {
             }
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(time/(totalTime + dt), time), VCellMessaging.ThrowOnException.NO); // progress message are throttled by vcellMessaging
 
+            // the expensive part of the simulation, update the system and relax the springs
+            long iterStart = System.nanoTime();
             time += dt;
             update();
             if(relaxationSteps > 2){
                 relaxSprings(relaxationSteps);
             }
+            long iterEnd = System.nanoTime();
+            long iterDuration = iterEnd - iterStart;
 
-        }
+            // gather the special statistics for multiple runs, compute them only inside run 1
+            if(runCounter == 1) {
+                iterCount++;
+                totalIterTime += iterDuration;
+
+                if(iterDuration < minIterTime) minIterTime = iterDuration;
+                if(iterDuration > maxIterTime) maxIterTime = iterDuration;
+
+                // Welford running variance
+                double delta = iterDuration - meanIterTime;
+                meanIterTime += delta / iterCount;
+                double delta2 = iterDuration - meanIterTime;
+                m2 += delta * delta2;
+
+                // Real-time ETA logging
+                long nowMs = System.currentTimeMillis();
+
+                if (nowMs >= nextEtaTimeMs && nowMs <= etaLoggingCutoffMs) {
+                    if (iterCount > 10) {
+                        double variance = (iterCount > 1) ? (m2 / (iterCount - 1)) : 0.0;
+                        double stddev = Math.sqrt(variance);
+
+                        long estTotalRuntimeNs = (long)(meanIterTime * totalSteps);
+                        long estRemainingRuntimeNs = (long)(meanIterTime * (totalSteps - iterCount));
+                        double ci = 2.0 * stddev; // ~95% confidence band
+                        long estRemainingLowNs  = (long)((meanIterTime - ci) * (totalSteps - iterCount));
+                        long estRemainingHighNs = (long)((meanIterTime + ci) * (totalSteps - iterCount));
+
+                        lg.info("ETA (run 1 @ " + ((nowMs - startTime)/1000) + "s): " +
+                                "total=" + IOHelp.formatNanoseconds(2, estTotalRuntimeNs) +
+                                ", remaining=" + IOHelp.formatNanoseconds(2, estRemainingRuntimeNs) +
+                                ", CI=[" + IOHelp.formatNanoseconds(2, estRemainingLowNs) + " .. " +
+                                IOHelp.formatNanoseconds(2, estRemainingHighNs) + "]");
+                        // Save last ETA snapshot
+                        lastEtaTimeMs = nowMs;
+                        lastEtaTotalNs = estTotalRuntimeNs;
+                        lastEtaRemainingNs = estRemainingRuntimeNs;
+                        lastEtaLowNs = estRemainingLowNs;
+                        lastEtaHighNs = estRemainingHighNs;
+                        lastEtaProgress = (double)iterCount / (double)totalSteps;
+                    }
+
+                    // Advance schedule
+                    if (etaScheduleIndex < etaScheduleSeconds.length - 1) {
+                        etaScheduleIndex++;
+                        nextEtaTimeMs = startTime + etaScheduleSeconds[etaScheduleIndex] * 1000L;
+                    } else {
+                        // After 60 seconds: every 60 seconds
+                        nextEtaTimeMs += 60_000L;
+                    }
+                }
+            }
+
+        }   // end of main simulation while loop
 
         stopTime = System.currentTimeMillis();
         try(PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "RunningTime.txt")))){
             pw.println("Running Time: " + IOHelp.formatTime(startTime, stopTime));
         } catch (IOException e) {
             lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
+        }
+        // Write last ETA snapshot and real duration
+        try (PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "LastEstimate.txt")))) {
+
+            pw.println("Real Running Time: " + IOHelp.formatTime(startTime, stopTime));
+            pw.println("Real Running Time (ns): " + (stopTime - startTime) * 1_000_000L);
+
+            if (lastEtaTimeMs > 0) {
+                pw.println();
+                pw.println("Last ETA snapshot:");
+                pw.println("  ETA computed at: " + IOHelp.formatTime(startTime, lastEtaTimeMs));
+                pw.println("  Progress at ETA: " + String.format("%.4f", lastEtaProgress * 100) + "%");
+
+                pw.println("  Estimated Total Runtime: " + IOHelp.formatNanoseconds(lastEtaTotalNs));
+                pw.println("  Estimated Remaining Runtime: " + IOHelp.formatNanoseconds(lastEtaRemainingNs));
+                pw.println("  Confidence Interval: [" +
+                        IOHelp.formatNanoseconds(lastEtaLowNs) + " .. " +
+                        IOHelp.formatNanoseconds(lastEtaHighNs) + "]");
+
+                long realNs = (stopTime - startTime) * 1_000_000L;
+                pw.println();
+                pw.println("Difference between ETA total and real: " +
+                        IOHelp.formatNanoseconds(realNs - lastEtaTotalNs));
+            } else {
+                pw.println("No ETA snapshot was computed (simulation finished before first ETA).");
+            }
+
+        } catch (IOException e) {
+            lg.error("Failed to write file 'LastEstimate.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();

@@ -372,6 +372,73 @@ public class MySystemTest {
         }
     }
 
+    /*
+     * We'll test a lengthy simulation with a lot of reactions, to see if the estimated duration is reasonable
+     * Keep in mind that if molecules are being created and destroyed, the number of reactions will vary and the
+     * estimated duration will be less accurate
+     */
+    @Test
+    public void estimateDurationRun1FromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;     // must be run index 1, this means batch run, also only run 1 computes estimates
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // change the initial number of molecules to 50, so that the simulation will run longer
+        // and we can test the estimated duration
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 200);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 200);
+
+        // create the input file
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            sys.runSystem();
+            Assertions.assertTrue(Files.exists(idaFile));
+            sys.getReactionCounter().printCounts();
+            sys.getReactionCounter().printDetailedCounts();
+            System.out.println("done");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+    // helper function to modify initial counts for molecule, so that I could test shorter and longer simulations
+    public static String setInitialValue(String input, String molecule, int newValue) {
+        // Regex explanation:
+        // MOLECULE: "MT0" Intracellular Number 50
+        // We capture:
+        //   group 1: the prefix up to "Number "
+        //   group 2: the old number
+        //
+        // Then we replace group 2 with newValue.
+        //
+        String regex = "(MOLECULE:\\s*\"" + molecule + "\"\\s+Intracellular\\s+Number\\s+)(\\d+)";
+        return input.replaceAll(regex, "$1" + newValue);
+    }
+
+
     // Logger sanity check. Confirms that Log4j2 configuration is found on the classpath,
     // that the logger instance lg is valid and that the logger is working. This test should always pass.
     @Test
