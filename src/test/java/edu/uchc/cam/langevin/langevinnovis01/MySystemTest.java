@@ -394,7 +394,7 @@ public class MySystemTest {
         Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
         Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
 
-        // change the initial number of molecules to 50, so that the simulation will run longer
+        // change the initial number of molecules, so that the simulation will run longer
         // and we can test the estimated duration
         inputFileContents = setInitialValue(inputFileContents, "MT0", 200);
         inputFileContents = setInitialValue(inputFileContents, "MT1", 200);
@@ -413,6 +413,16 @@ public class MySystemTest {
             sys = new MySystem(g, runCounter, true, vcellMessaging);
             assertNotNull(sys, "MySystem object should not be null");
 
+            // change the ETA calculator parameters so that we can model the behavior / accuracy
+            // during long simulations (without really running them for weeks), and see if the estimated
+            // duration is reasonable
+            sys.getEtaTracker().setEtaLoggingCutoffMs(10_000);  // miliseconds
+            sys.getEtaTracker().setEtaScheduleSeconds(new int[] {1,2,3}); // custom schedule
+//            sys.getEtaTracker().setUseDefaultSchedule(false); // stop after schedule
+            sys.getEtaTracker().setUseDefaultSchedule(true);
+            sys.getEtaTracker().setDefaultScheduleIntervalMs(5000); // every xxx miliseconds
+
+            // here all the work is done
             sys.runSystem();
             Assertions.assertTrue(Files.exists(idaFile));
             sys.getReactionCounter().printCounts();
@@ -424,6 +434,133 @@ public class MySystemTest {
             deleteDirectory(tempDirectory.toFile());
         }
     }
+
+    /*
+     * We have disabled the hardcoded schedule, and we want to make sure that the default schedule is used instead
+     */
+    @Test
+    public void estimateDurationDefaultScheduleOnly() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_default_schedule");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // Make simulation run a bit longer
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 50);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 50);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            // *** Hardcoded schedule disabled ***
+            sys.getEtaTracker().setEtaScheduleSeconds(null);
+
+            // *** Default schedule enabled ***
+            sys.getEtaTracker().setUseDefaultSchedule(true);
+            sys.getEtaTracker().setDefaultScheduleIntervalMs(5000); // every 5 seconds
+
+            // Cutoff at 12 seconds (should allow 2 ETA logs)
+            sys.getEtaTracker().setEtaLoggingCutoffMs(12_000);
+
+            // Run simulation
+            sys.runSystem();
+
+            // Simulation must still produce output
+            Assertions.assertTrue(Files.exists(idaFile));
+
+            // *** Verify ETA WAS computed ***
+            long lastEta = sys.getEtaTracker().getLastEtaTimeMs();
+            Assertions.assertTrue(lastEta >= 5000,
+                    "ETA should have been computed at least once using default schedule");
+
+            System.out.println("Default schedule ETA test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    /*
+     * We have totaly disabled the ETA computation, and we want to make sure that it is not computed at all
+     */
+    @Test
+    public void estimateDurationEtaDisabled() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_eta_disabled");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // Make simulation run very fast, we just want to see that no ETA gets computed
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 5);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 5);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            // *** Disable ETA completely ***
+            sys.getEtaTracker().setEtaScheduleSeconds(null);   // no schedule
+            sys.getEtaTracker().setUseDefaultSchedule(false);  // no fallback interval
+
+            // Run simulation
+            sys.runSystem();
+
+            // Simulation must still produce output
+            Assertions.assertTrue(Files.exists(idaFile));
+
+            // *** Verify ETA was never computed ***
+            Assertions.assertEquals(-1, sys.getEtaTracker().getLastEtaTimeMs(),
+                    "ETA should be disabled and never computed");
+
+            System.out.println("ETA disabled test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+
     // helper function to modify initial counts for molecule, so that I could test shorter and longer simulations
     public static String setInitialValue(String input, String molecule, int newValue) {
         // Regex explanation:

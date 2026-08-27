@@ -10,6 +10,7 @@ import edu.uchc.cam.langevin.counter.*;
 import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
+import edu.uchc.cam.langevin.helpernovis.EtaTracker;
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
 import edu.uchc.cam.langevin.helpernovis.Location;
 import edu.uchc.cam.langevin.helpernovis.Rand;
@@ -139,6 +140,7 @@ public class MySystem {
     private long stopTime;
 
     private final VCellMessaging vcellMessaging;
+    private EtaTracker etaTracker;
 
     // simple pseudo random number generator using the LCG algorithm (Linear Congruential Generator)
     public class LangevinLCG {
@@ -196,6 +198,7 @@ public class MySystem {
         this.runCounter = runCounter;
         this.useOutputFile = useOutputFile;
         this.vcellMessaging = vcellMessaging;
+        this.etaTracker = new EtaTracker();
 
         vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"), VCellMessaging.ThrowOnException.NO);
 
@@ -265,30 +268,28 @@ public class MySystem {
     public ArrayList<Molecule> getMolecules(){
         return molecules;
     }
-
     public ArrayList<Bond> getBonds(){
         return bonds;
     }
-
     public ArrayList<Site> getSites(){
         return sites;
     }
-
     public double getTime(){
         return time;
     }
-
     public File getFolder(){
         return folder;
     }
-
     public int getRunCounter(){
         return runCounter;
     }
-
     public ReactionCounter getReactionCounter() {
         return reactionCounter;
     }
+    public EtaTracker getEtaTracker() {
+        return etaTracker;
+    }
+
 
     // *********************  FOLDER MANAGEMENT ************************
     private void folderSetup() throws IOException {
@@ -1082,6 +1083,7 @@ public class MySystem {
         lg.debug("This stdout file is associated with run counter " + runCounter + ".");
         lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
+        etaTracker.initialize(startTime);
 
         // CREATE LOG FILE IMMEDIATELY AT STARTUP
         if (useOutputFile) {
@@ -1107,30 +1109,14 @@ public class MySystem {
          * time between iterations, min / max / running average
          * running estimation of ETA, remaining runtime, total runtime, confidence bounds
          */
-        long iterCount = 0;
-        long totalIterTime = 0;   // sum of all iteration durations (ns)
-        long minIterTime = Long.MAX_VALUE;
-        long maxIterTime = Long.MIN_VALUE;
-        double meanIterTime = 0.0;
-        double m2 = 0.0; // for variance (Welford)
         int totalSteps = (int)(totalTime / dt);
 
-        final int[] etaScheduleSeconds = {      // Real-time ETA schedule (seconds)
-                1,2,3,4,5,6,7,8,9,10,
-                20,30,40,50,60
-        };
-        int etaScheduleIndex = 0;
-        long nextEtaTimeMs = startTime + etaScheduleSeconds[0] * 1000L; // First ETA trigger time
-        final long etaLoggingCutoffMs = startTime + 3600_000L;          // Stop ETA logging after 1 hour
-        // because of the fact that we stop computing ETA after 1 hour, we may be seriously off for very long
-        // simulations. We will log our latest estimate separately and we'll compare that with the effective
-        // duration we get at the very end. These vars are where we store what we need.
-        long lastEtaTimeMs = -1;
-        long lastEtaTotalNs = -1;
-        long lastEtaRemainingNs = -1;
-        long lastEtaLowNs = -1;
-        long lastEtaHighNs = -1;
-        double lastEtaProgress = -1.0;
+//        long lastEtaTimeMs = -1;
+//        long lastEtaTotalNs = -1;
+//        long lastEtaRemainingNs = -1;
+//        long lastEtaLowNs = -1;
+//        long lastEtaHighNs = -1;
+//        double lastEtaProgress = -1.0;
         // ------------------------------------------------------------------------------
 
         // GET THE DATA AT THE ZERO TIME POINT
@@ -1206,57 +1192,9 @@ public class MySystem {
 
             // gather the special statistics for multiple runs, compute them only inside run 1
             if(runCounter == 1) {
-                iterCount++;
-                totalIterTime += iterDuration;
-
-                if(iterDuration < minIterTime) minIterTime = iterDuration;
-                if(iterDuration > maxIterTime) maxIterTime = iterDuration;
-
-                // Welford running variance
-                double delta = iterDuration - meanIterTime;
-                meanIterTime += delta / iterCount;
-                double delta2 = iterDuration - meanIterTime;
-                m2 += delta * delta2;
-
-                // Real-time ETA logging
-                long nowMs = System.currentTimeMillis();
-
-                if (nowMs >= nextEtaTimeMs && nowMs <= etaLoggingCutoffMs) {
-                    if (iterCount > 10) {
-                        double variance = (iterCount > 1) ? (m2 / (iterCount - 1)) : 0.0;
-                        double stddev = Math.sqrt(variance);
-
-                        long estTotalRuntimeNs = (long)(meanIterTime * totalSteps);
-                        long estRemainingRuntimeNs = (long)(meanIterTime * (totalSteps - iterCount));
-                        double ci = 2.0 * stddev; // ~95% confidence band
-                        long estRemainingLowNs  = (long)((meanIterTime - ci) * (totalSteps - iterCount));
-                        long estRemainingHighNs = (long)((meanIterTime + ci) * (totalSteps - iterCount));
-
-                        lg.info("ETA (run 1 @ " + ((nowMs - startTime)/1000) + "s): " +
-                                "total=" + IOHelp.formatNanoseconds(2, estTotalRuntimeNs) +
-                                ", remaining=" + IOHelp.formatNanoseconds(2, estRemainingRuntimeNs) +
-                                ", CI=[" + IOHelp.formatNanoseconds(2, estRemainingLowNs) + " .. " +
-                                IOHelp.formatNanoseconds(2, estRemainingHighNs) + "]");
-                        // Save last ETA snapshot
-                        lastEtaTimeMs = nowMs;
-                        lastEtaTotalNs = estTotalRuntimeNs;
-                        lastEtaRemainingNs = estRemainingRuntimeNs;
-                        lastEtaLowNs = estRemainingLowNs;
-                        lastEtaHighNs = estRemainingHighNs;
-                        lastEtaProgress = (double)iterCount / (double)totalSteps;
-                    }
-
-                    // Advance schedule
-                    if (etaScheduleIndex < etaScheduleSeconds.length - 1) {
-                        etaScheduleIndex++;
-                        nextEtaTimeMs = startTime + etaScheduleSeconds[etaScheduleIndex] * 1000L;
-                    } else {
-                        // After 60 seconds: every 60 seconds
-                        nextEtaTimeMs += 60_000L;
-                    }
-                }
+                etaTracker.updateIterationStats(iterDuration);
+                etaTracker.maybeLog(System.currentTimeMillis(), totalSteps, lg);
             }
-
         }   // end of main simulation while loop
 
         stopTime = System.currentTimeMillis();
@@ -1271,25 +1209,25 @@ public class MySystem {
             pw.println("Real Running Time: " + IOHelp.formatTime(startTime, stopTime));
             pw.println("Real Running Time (ns): " + (stopTime - startTime) * 1_000_000L);
 
-            if (lastEtaTimeMs > 0) {
-                pw.println();
-                pw.println("Last ETA snapshot:");
-                pw.println("  ETA computed at: " + IOHelp.formatTime(startTime, lastEtaTimeMs));
-                pw.println("  Progress at ETA: " + String.format("%.4f", lastEtaProgress * 100) + "%");
-
-                pw.println("  Estimated Total Runtime: " + IOHelp.formatNanoseconds(lastEtaTotalNs));
-                pw.println("  Estimated Remaining Runtime: " + IOHelp.formatNanoseconds(lastEtaRemainingNs));
-                pw.println("  Confidence Interval: [" +
-                        IOHelp.formatNanoseconds(lastEtaLowNs) + " .. " +
-                        IOHelp.formatNanoseconds(lastEtaHighNs) + "]");
-
-                long realNs = (stopTime - startTime) * 1_000_000L;
-                pw.println();
-                pw.println("Difference between ETA total and real: " +
-                        IOHelp.formatNanoseconds(realNs - lastEtaTotalNs));
-            } else {
-                pw.println("No ETA snapshot was computed (simulation finished before first ETA).");
-            }
+//            if (lastEtaTimeMs > 0) {
+//                pw.println();
+//                pw.println("Last ETA snapshot:");
+//                pw.println("  ETA computed at: " + IOHelp.formatTime(startTime, lastEtaTimeMs));
+//                pw.println("  Progress at ETA: " + String.format("%.4f", lastEtaProgress * 100) + "%");
+//
+//                pw.println("  Estimated Total Runtime: " + IOHelp.formatNanoseconds(lastEtaTotalNs));
+//                pw.println("  Estimated Remaining Runtime: " + IOHelp.formatNanoseconds(lastEtaRemainingNs));
+//                pw.println("  Confidence Interval: [" +
+//                        IOHelp.formatNanoseconds(lastEtaLowNs) + " .. " +
+//                        IOHelp.formatNanoseconds(lastEtaHighNs) + "]");
+//
+//                long realNs = (stopTime - startTime) * 1_000_000L;
+//                pw.println();
+//                pw.println("Difference between ETA total and real: " +
+//                        IOHelp.formatNanoseconds(realNs - lastEtaTotalNs));
+//            } else {
+//                pw.println("No ETA snapshot was computed (simulation finished before first ETA).");
+//            }
 
         } catch (IOException e) {
             lg.error("Failed to write file 'LastEstimate.txt' in: " + dataFolder.getAbsolutePath(), e);
