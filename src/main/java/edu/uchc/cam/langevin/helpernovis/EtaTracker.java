@@ -11,7 +11,8 @@ public class EtaTracker {
     // ----------------------------------------------------------------------
     // Configurable parameters (with defaults)
     // ----------------------------------------------------------------------
-    private long etaLoggingCutoffMs = 3600_000L; // we stop eta computing after cutoff (default: 1 hour)
+    private static long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 1000L; // 1 hour
+    private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: 1 hour)
     private int[] etaScheduleSeconds = {    // hardcoded schedule of when to log ETA (in seconds) configurable by user
             1,2,3,4,5,6,7,8,9,10,
             20,30,40,50,60
@@ -44,7 +45,7 @@ public class EtaTracker {
     private long lastEtaLowNs = -1;
     private long lastEtaHighNs = -1;
     private double lastEtaProgress = -1.0;
-    private int errorCounter = 0;
+
     // ----------------------------------------------------------------------
     // Constructor
     // ----------------------------------------------------------------------
@@ -58,6 +59,7 @@ public class EtaTracker {
     public void initialize(long startTimeMs) {
 
         this.startTimeMs = startTimeMs;
+        this.etaLoggingCutoffMs = startTimeMs + DEFAULT_ETA_LOGGING_CUTOFF_MS;
 
         // Reset stats
         iterCount = 0;
@@ -94,7 +96,7 @@ public class EtaTracker {
     // Setters for tests
     // ----------------------------------------------------------------------
     public void setEtaLoggingCutoffMs(long cutoffMs) {
-        this.etaLoggingCutoffMs = cutoffMs;
+        this.DEFAULT_ETA_LOGGING_CUTOFF_MS = cutoffMs;
     }
     public void setEtaScheduleSeconds(int[] schedule) {
         this.etaScheduleSeconds = schedule;     // schedule may be null
@@ -125,23 +127,13 @@ public class EtaTracker {
     // Maybe log ETA (if schedule and cutoff allow)
     // ----------------------------------------------------------------------
     public void maybeLog(long nowMs, int totalSteps, Logger lg) {
-        if(errorCounter == 50) {
-            return;
-        }
         if (nowMs < nextEtaTimeMs || nowMs > etaLoggingCutoffMs) {
-            errorCounter++;
-            if(errorCounter < 50) {
-                lg.info("ETA logging skipped at " + ((nowMs - startTimeMs)/1000) + "s: nextEtaTimeMs=" + (nextEtaTimeMs - startTimeMs) + "ms, etaLoggingCutoffMs=" + (etaLoggingCutoffMs - startTimeMs) + "ms");
-            }
             return;
         }
         if (iterCount <= 10) {  // prevents garbage ETA estimates during warmup phase of the simulation
-            errorCounter++;
-            lg.info("ETA logging skipped at " + ((nowMs - startTimeMs)/1000) + "s: iterCount=" + iterCount + " (too few iterations for reliable ETA)");
             return;
         }
 
-        lg.info("ETA logging at " + ((nowMs - startTimeMs)/1000) + "s: iterCount=" + iterCount + ", meanIterTime=" + meanIterTime + "ns, minIterTime=" + minIterTime + "ns, maxIterTime=" + maxIterTime + "ns");
         // Compute variance and confidence interval
         double variance = (iterCount > 1) ? (m2 / (iterCount - 1)) : 0.0;
         double stddev = Math.sqrt(variance);
@@ -157,8 +149,8 @@ public class EtaTracker {
         lastEtaHighNs = (long)((meanIterTime + ci) * (totalSteps - iterCount));
 
         // Log ETA
-        lg.info("ETA @ " + ((nowMs - startTimeMs)/1000) + "s: " +
-                "total=" + IOHelp.formatNanoseconds(lastEtaTotalNs) +
+        lg.info("ETA @ " + ((nowMs - startTimeMs)/1000) + "s: " + iterCount + " iterations completed, " +
+                "Total estimated run time = " + IOHelp.formatNanoseconds(lastEtaTotalNs) +
                 ", remaining=" + IOHelp.formatNanoseconds(lastEtaRemainingNs) +
                 ", CI=[" + IOHelp.formatNanoseconds(lastEtaLowNs) + " .. " +
                 IOHelp.formatNanoseconds(lastEtaHighNs) + "]");
@@ -170,6 +162,14 @@ public class EtaTracker {
     // Advance schedule (compute when next ETA log should occur)
     // ----------------------------------------------------------------------
     private void advanceSchedule() {
+        if (etaScheduleSeconds == null || etaScheduleSeconds.length == 0) {
+            if (useDefaultSchedule) {
+                nextEtaTimeMs += defaultScheduleIntervalMs;
+            } else {
+                nextEtaTimeMs = Long.MAX_VALUE; // disable ETA entirely
+            }
+            return;
+        }
         if (etaScheduleIndex < etaScheduleSeconds.length - 1) {
             etaScheduleIndex++;
             nextEtaTimeMs = startTimeMs + etaScheduleSeconds[etaScheduleIndex] * 1000L;

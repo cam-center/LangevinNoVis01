@@ -456,8 +456,8 @@ public class MySystemTest {
         Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
 
         // Make simulation run a bit longer
-        inputFileContents = setInitialValue(inputFileContents, "MT0", 50);
-        inputFileContents = setInitialValue(inputFileContents, "MT1", 50);
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 20);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 20);
 
         Files.writeString(modelFile, inputFileContents);
 
