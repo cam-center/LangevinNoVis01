@@ -1085,8 +1085,10 @@ public class MySystem {
         startTime = System.currentTimeMillis();
         etaTracker.initialize(startTime);
 
-        // CREATE LOG FILE IMMEDIATELY AT STARTUP
-        if (useOutputFile) {
+        // create log file immediately at startup for batch run
+        // using the existence of runCounter == 1, which allows us to differentiate from single runs
+        // this is what the watchdog will use when looking for stale log files
+        if (useOutputFile && runCounter == 1) {
             try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), false))) {
                 p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
             } catch (IOException ioe) {
@@ -1103,20 +1105,8 @@ public class MySystem {
         double nextImageTime = dtimage;
         int relaxationSteps = (int)(dt/dtspring);
 
-        /*
-         * ------------------------------------------------------------------------------
-         * Special statistics during multiple runs, will be only computed for run index 1
-         * time between iterations, min / max / running average
-         * running estimation of ETA, remaining runtime, total runtime, confidence bounds
-         */
         int totalSteps = (int)(totalTime / dt);
 
-//        long lastEtaTimeMs = -1;
-//        long lastEtaTotalNs = -1;
-//        long lastEtaRemainingNs = -1;
-//        long lastEtaLowNs = -1;
-//        long lastEtaHighNs = -1;
-//        double lastEtaProgress = -1.0;
         // ------------------------------------------------------------------------------
 
         // GET THE DATA AT THE ZERO TIME POINT
@@ -1191,10 +1181,11 @@ public class MySystem {
             long iterDuration = iterEnd - iterStart;
 
             // gather the special statistics for multiple runs, compute them only inside run 1
-            if(runCounter == 1) {
+            if(runCounter == 1 && !etaTracker.isDisabled()) {
                 etaTracker.updateIterationStats(iterDuration);
                 etaTracker.maybeLog(System.currentTimeMillis(), totalSteps, lg);
             }
+
         }   // end of main simulation while loop
 
         stopTime = System.currentTimeMillis();
@@ -1203,12 +1194,12 @@ public class MySystem {
         } catch (IOException e) {
             lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
-        // Write last ETA snapshot and real duration
-        try (PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "LastEstimate.txt")))) {
-
-            pw.println("Real Running Time: " + IOHelp.formatTime(startTime, stopTime));
-            pw.println("Real Running Time (ns): " + (stopTime - startTime) * 1_000_000L);
-
+        // TODO: Write last ETA snapshot and real duration
+//        try (PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "LastEstimate.txt")))) {
+//
+//            pw.println("Real Running Time: " + IOHelp.formatTime(startTime, stopTime));
+//            pw.println("Real Running Time (ns): " + (stopTime - startTime) * 1_000_000L);
+//
 //            if (lastEtaTimeMs > 0) {
 //                pw.println();
 //                pw.println("Last ETA snapshot:");
@@ -1228,10 +1219,10 @@ public class MySystem {
 //            } else {
 //                pw.println("No ETA snapshot was computed (simulation finished before first ETA).");
 //            }
-
-        } catch (IOException e) {
-            lg.error("Failed to write file 'LastEstimate.txt' in: " + dataFolder.getAbsolutePath(), e);
-        }
+//
+//        } catch (IOException e) {
+//            lg.error("Failed to write file 'LastEstimate.txt' in: " + dataFolder.getAbsolutePath(), e);
+//        }
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
         this.writeSiteIDs();
