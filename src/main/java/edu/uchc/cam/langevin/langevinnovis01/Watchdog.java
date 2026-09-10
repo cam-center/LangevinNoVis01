@@ -96,45 +96,49 @@ public class Watchdog {
 
         lg.info("Watchdog entering doWork()");
 
+        // TODO: we send just one of this to see what it does on the client side (eventually we'll use it for ETA maybe)
+        // vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
+
+
 //        long start = System.currentTimeMillis();
         long timeoutMillis = watchdogTimeout * 1000L;
-        File log0 = new File(simulationFolder, simulationName + "0.log");
+        File log1 = new File(simulationFolder, simulationName + "1.log");
 
-        // first while loop, we look for the first log file to be created, meaning that slurm started launching simulation tasks
+        // first while loop, we look for the log file for run #1 to be created, meaning that slurm started launching simulation tasks
         // ignore stale logs from previous runs
         while (true) {
-            // the first log file, for simulation 0 should be created very soon, although it will be empty
+            // the first log file, for simulation 1 should be created very soon, although it will be empty
             // for very long simulation (may take 1 week!) the first 1% advance may take hours though
             long elapsed = System.currentTimeMillis() - watchdogStartTime;
 
-            if (log0.exists()) {
-                long lastModified = log0.lastModified();
+            if (log1.exists()) {
+                long lastModified = log1.lastModified();
 
                 if (lastModified >= watchdogStartTime) {
-                    lg.info("Found fresh log file for run 0: " + log0.getAbsolutePath()
+                    lg.info("Found fresh log file for run #1: " + log1.getAbsolutePath()
                             + " (lastModified=" + lastModified + ")");
                     break;   // proceed to second loop
                 } else {
-                    lg.warn("Ignoring stale log file for run 0: " + log0.getAbsolutePath()
+                    lg.warn("Ignoring stale log file for run #1: " + log1.getAbsolutePath()
                             + " (lastModified=" + lastModified
                             + ", watchdogStart=" + watchdogStartTime + ")");
                 }
             }
 
-            lg.info("Waiting for fresh log file: " + log0.getAbsolutePath()
+            lg.info("Waiting for fresh log file: " + log1.getAbsolutePath()
                     + " (elapsed time: " + (elapsed / 1000L) + " seconds)");
 
             if (elapsed >= timeoutMillis) {
-                lg.error("Timeout waiting for fresh log file: " + log0.getAbsolutePath());
+                lg.error("Timeout waiting for fresh log file: " + log1.getAbsolutePath());
                 throw new RuntimeException("Watchdog timeout: fresh log file not found");
             }
 
-            // Sleep once per tick — absolutely required
+            // Sleep once per tick
             try {
                 Thread.sleep(watchdogTick * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new RuntimeException("Watchdog interrupted", e);
+                throw new RuntimeException("Watchdog interrupted: ", e);
             }
         }
 
@@ -149,10 +153,8 @@ public class Watchdog {
 
         long lastTick = System.currentTimeMillis();
         while (true) {
-            // we do not timeout this! it's slurm's job to take us out of the whole script
-            // we really have no good way of knowing when the first percent of the simulation may be done,
-            // although we can have an educated guess from the job timeout in seconds: if we divide that by 100 we
-            // can get an estimate of how long the first percent may take
+
+            // TODO: someday in the future we will also look for ETA estimator
 
             long now = System.currentTimeMillis();
             long elapsed = (now - lastTick) / 1000L;
@@ -167,6 +169,8 @@ public class Watchdog {
 
             // Sleep for watchdogTick seconds
             try {
+                // TODO: consider using a ScheduledExecutorService instead of Thread.sleep() for better timing accuracy and interrupt handling
+                // TODO: we may want to adjust the sleep duration based on the ETA estimation to avoid spamming the messaging system and / or the log
                 Thread.sleep(watchdogTick * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -196,7 +200,7 @@ public class Watchdog {
             }
 
             long lastMod = f.lastModified();
-            // Ignore stale logs, we get here if there's a fresh log for index 0, but we can't be sure about the others
+            // Ignore stale logs, we get here if there's a fresh log for run index 1, but we can't be sure about the others
             if (lastMod < watchdogStartTime) {
                 latestPercent[i] = 0;
                 sum += 0;
@@ -218,7 +222,6 @@ public class Watchdog {
                     // that equals a progress regression, we just ignore this tick and keep the previous value
                 }
             }
-
             sum += latestPercent[i];
         }
 
@@ -233,8 +236,9 @@ public class Watchdog {
             lastBatchPercent = batchPercent;
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
         } else {
-            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
-            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
+            // reducing the spam for now by commenting out useless message
+//            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
+//            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
         }
     }
 

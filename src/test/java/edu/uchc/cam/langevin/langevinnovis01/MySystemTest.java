@@ -1,6 +1,7 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
-import edu.uchc.cam.langevin.counter.ReactionCounter;
+import edu.uchc.cam.langevin.helpernovis.EtaTracker;
+import edu.uchc.cam.langevin.helpernovis.IOHelp;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
@@ -371,6 +372,289 @@ public class MySystemTest {
             deleteDirectory(tempDirectory.toFile());
         }
     }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * We'll test a lengthy simulation with a lot of reactions, to see if the estimated duration is reasonable
+     * Keep in mind that if molecules are being created and destroyed, the number of reactions will vary and the
+     * estimated duration will be less accurate
+     * We'll use both hardcoded and default schedule
+     */
+    @Test
+    public void estimateDurationFromResource() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;     // must be run index 1, this means batch run, also only run 1 computes estimates
+
+        // Load the real file from src/test/resources
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_simulation");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // change the initial number of molecules, so that the simulation will run longer
+        // and we can test the estimated duration
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 200);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 200);
+
+        // create the input file
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g, "Global object should not be null");
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys, "MySystem object should not be null");
+
+            // change the ETA calculator parameters so that we can model the behavior / accuracy
+            // during long simulations (without really running them for weeks), and see if the estimated
+            // duration is reasonable
+            sys.getEtaTracker().setUseHardcodedSchedule(true); // enable hardcoded schedule (default is true but we do it as a reminder)
+            sys.getEtaTracker().setEtaHardcodedScheduleSeconds(new int[] {2,4,6,8}); // custom schedule
+            sys.getEtaTracker().setUseDefaultSchedule(true);    // enable default schedule
+            sys.getEtaTracker().setDefaultScheduleIntervalMs(5000); // every xxx miliseconds
+            sys.getEtaTracker().setEtaLoggingCutoffMs(20_000);  // cutoff for default schedule, miliseconds
+
+
+            // here all the work is done
+            long startTime = System.currentTimeMillis();
+            sys.runSystem();
+            long endTime = System.currentTimeMillis();
+            Assertions.assertTrue(Files.exists(idaFile));
+            long predictedDurationNs = sys.getEtaTracker().getLastEtaTotalNs();     // nanoseconds
+            long actualDurationMs = endTime - startTime;                            // miliseconds
+            System.out.println("Actual duration:    " + IOHelp.formatNanoseconds(2, actualDurationMs*1_000_000L));
+            System.out.println("Predicted duration: " + IOHelp.formatNanoseconds(2, predictedDurationNs));
+            System.out.println("Difference:       " + IOHelp.formatNanoseconds(2, Math.abs(actualDurationMs*1_000_000 - predictedDurationNs)));
+
+            System.out.println("done");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * We have disabled the default schedule, and we want to make sure that the hardcoded schedule is used instead
+     */
+    @Test
+    public void estimateDurationHardcodedScheduleOnly() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_hardcoded_schedule");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // Make simulation run long enough to hit 1s, 2s, 3s ETA points
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 40);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 40);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            EtaTracker eta = sys.getEtaTracker();
+
+            // *** Hardcoded schedule only ***
+            eta.setEtaHardcodedScheduleSeconds(new int[] {1, 2, 3, 6, 12, 20});     // ETA at 1s, 2s, 3s...
+            eta.setUseDefaultSchedule(false);   // disable fallback
+            eta.setEtaLoggingCutoffMs(10_000);  // IRRELEVANT! fallback is disabled, we stop after the hardcoded schedule
+
+            // Run simulation
+            sys.runSystem();
+
+            // Simulation must produce output
+            Assertions.assertTrue(Files.exists(idaFile));
+
+            // *** Verify ETA fired at least once ***
+            long lastEta = eta.getLastEtaTimeMs();
+            Assertions.assertNotEquals(-1, lastEta,
+                    "ETA should have been computed at least once using the hardcoded schedule");
+
+            System.out.println("Hardcoded schedule ETA test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * We have disabled the hardcoded schedule, and we want to make sure that the default schedule is used instead
+     */
+    @Test
+    public void estimateDurationDefaultScheduleOnly() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_default_schedule");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // Make simulation run a bit longer
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 20);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 20);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            // *** Hardcoded schedule disabled ***
+            sys.getEtaTracker().setUseHardcodedSchedule(false);
+
+            // *** Default schedule enabled ***
+            sys.getEtaTracker().setUseDefaultSchedule(true);
+            sys.getEtaTracker().setDefaultScheduleIntervalMs(5000); // every 5 seconds
+
+            // Cutoff at 12 seconds (should allow 2 ETA logs)
+            sys.getEtaTracker().setEtaLoggingCutoffMs(12_000);
+
+            // Run simulation
+            sys.runSystem();
+
+            // Simulation must still produce output
+            Assertions.assertTrue(Files.exists(idaFile));
+
+            // *** Verify ETA WAS computed ***
+            long lastEta = sys.getEtaTracker().getLastEtaTimeMs();
+            Assertions.assertNotEquals(-1, lastEta,
+                    "ETA should have been computed at least once using the default schedule");
+
+            System.out.println("Default schedule ETA test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    /*
+     * We have totaly disabled the ETA computation, and we want to make sure that it is not computed at all
+     * This is fast, no need to disable it for github actions
+     */
+    @Test
+    public void estimateDurationEtaDisabled() throws IOException {
+        String sim_base_name = "sim";
+        int runCounter = 1;
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_eta_disabled");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+
+        // Make simulation run very fast, we just want to see that no ETA gets computed
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 5);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 5);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            // *** Disable ETA completely ***
+            sys.getEtaTracker().setUseHardcodedSchedule(false);    // no hardcoded schedule
+            sys.getEtaTracker().setUseDefaultSchedule(false);       // no default schedule
+
+            // Run simulation
+            sys.runSystem();
+
+            // Simulation must still produce output
+            Assertions.assertTrue(Files.exists(idaFile));
+
+            // *** Verify ETA was never computed ***
+            Assertions.assertEquals(-1, sys.getEtaTracker().getLastEtaTimeMs(),
+                    "ETA should be disabled and never computed");
+
+            System.out.println("ETA disabled test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // ----------------------------------------------------------------------------------
+
+    // helper function to modify initial counts for molecule, so that I could test shorter and longer simulations
+    public static String setInitialValue(String input, String molecule, int newValue) {
+        // Regex explanation:
+        // MOLECULE: "MT0" Intracellular Number 50
+        // We capture:
+        //   group 1: the prefix up to "Number "
+        //   group 2: the old number
+        //
+        // Then we replace group 2 with newValue.
+        //
+        String regex = "(MOLECULE:\\s*\"" + molecule + "\"\\s+Intracellular\\s+Number\\s+)(\\d+)";
+        return input.replaceAll(regex, "$1" + newValue);
+    }
+
 
     // Logger sanity check. Confirms that Log4j2 configuration is found on the classpath,
     // that the logger instance lg is valid and that the logger is working. This test should always pass.

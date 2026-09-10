@@ -10,6 +10,7 @@ import edu.uchc.cam.langevin.counter.*;
 import edu.uchc.cam.langevin.g.object.GMolecule;
 import edu.uchc.cam.langevin.g.object.GState;
 import edu.uchc.cam.langevin.g.reaction.GDecayReaction;
+import edu.uchc.cam.langevin.helpernovis.EtaTracker;
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
 import edu.uchc.cam.langevin.helpernovis.Location;
 import edu.uchc.cam.langevin.helpernovis.Rand;
@@ -98,12 +99,14 @@ public class MySystem {
     private final int npartz;
 
     // Temporal system information.
-    private final double totalTime;
+    private final double totalTime;     // simulation total time (time between begin time and end time)
     private final double dt;            // simulation time step default 1.0E-8
     private final double dtspring;      // spring interval default 1.0E-9
     private final double dtdata;        // data output interval (when we update the counters) default 1.0E-4
     private final double dtimage;       // image output interval default 1.0E-4
+
     // Current system time
+    // starts at 0 and ends at totalTime, grows in increments of dt
     private double time = 0;
 
     // File information
@@ -133,10 +136,11 @@ public class MySystem {
     private final ArrayList<Partition> activePartitions = new ArrayList<>();
 
     // Time we started the simulation and time it finished
-    private long startTime;
+    private long startTime; //  real system time: System.currentTimeMillis();
     private long stopTime;
 
     private final VCellMessaging vcellMessaging;
+    private EtaTracker etaTracker;
 
     // simple pseudo random number generator using the LCG algorithm (Linear Congruential Generator)
     public class LangevinLCG {
@@ -194,6 +198,7 @@ public class MySystem {
         this.runCounter = runCounter;
         this.useOutputFile = useOutputFile;
         this.vcellMessaging = vcellMessaging;
+        this.etaTracker = new EtaTracker();
 
         vcellMessaging.sendWorkerEvent(WorkerEvent.startingEvent("Starting Simulation"), VCellMessaging.ThrowOnException.NO);
 
@@ -263,30 +268,28 @@ public class MySystem {
     public ArrayList<Molecule> getMolecules(){
         return molecules;
     }
-
     public ArrayList<Bond> getBonds(){
         return bonds;
     }
-
     public ArrayList<Site> getSites(){
         return sites;
     }
-
     public double getTime(){
         return time;
     }
-
     public File getFolder(){
         return folder;
     }
-
     public int getRunCounter(){
         return runCounter;
     }
-
     public ReactionCounter getReactionCounter() {
         return reactionCounter;
     }
+    public EtaTracker getEtaTracker() {
+        return etaTracker;
+    }
+
 
     // *********************  FOLDER MANAGEMENT ************************
     private void folderSetup() throws IOException {
@@ -1080,22 +1083,37 @@ public class MySystem {
         lg.debug("This stdout file is associated with run counter " + runCounter + ".");
         lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
+        etaTracker.initialize(startTime);
 
-        // CREATE LOG FILE IMMEDIATELY AT STARTUP
-        if (useOutputFile) {
+        // create fresh log file immediately at startup for all runs in the batch except for run #0
+        if (useOutputFile && runCounter != 0) {
             try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), false))) {
+                p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
+            } catch (IOException ioe) {
+                lg.warn("Could not create initial log file: " + g.getOutputFile(), ioe);
+            }
+        } else if(useOutputFile && runCounter == 0) {
+            // we know for sure that the log file for run 0 was created at the start of the solver
+            // and we need the special preamble for single runs, so we can just append to it
+            try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), true))) {
                 p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
             } catch (IOException ioe) {
                 lg.warn("Could not create initial log file: " + g.getOutputFile(), ioe);
             }
         }
 
+        /*
+         * Meaningful simulation times, data points, image points, progress updates / logging
+         */
         double nextRealTime = totalTime/100;
         int percentComplete = 0;
         double nextDataTime = dtdata;
         double nextImageTime = dtimage;
-
         int relaxationSteps = (int)(dt/dtspring);
+
+        long totalSteps = (long)(totalTime / dt);
+
+        // ------------------------------------------------------------------------------
 
         // GET THE DATA AT THE ZERO TIME POINT
         writePositions();
@@ -1112,36 +1130,35 @@ public class MySystem {
         sitePropertyCounter.countProperties();
 //        locationTracker.initializeMaps();
 //        locationTracker.trackPositions();
-        // We go ever so slightly over the last time point to make sure we
-        // get data at the last time point.
+
+        lg.info("Number of steps: " + totalSteps);
+        lg.info("Spring relaxation steps: " + relaxationSteps);
+
+        // We go ever so slightly over the last time point to make sure we get data at the last time point.
         while(time < totalTime + dt){
-            // Look to see if we should output data
+            // lg.info("Simulation time: " + time + " of " + totalTime);    // this is too much output
+
+            // ----- Look to see if we should output data
             if(time >= nextDataTime){
                 moleculeCounter.countMolecules();
-                // moleculeCounter.writePartialData(dataFolder);
-
                 stateCounter.countStates();
-                // stateCounter.writePartialData(dataFolder);
-
                 bondCounter.countBonds();
-                // bondCounter.writePartialData(dataFolder);
                 if(countingClusters){
                     clusterCounter.countClusters();
                     clusterCounter.writeClusters(dataFolder);
                 }
                 sitePropertyCounter.countProperties();
-//                locationTracker.trackPositions();
-
                 reactionCounter.initDatapoint();    // we update in real time as reactions happen
-
                 nextDataTime += dtdata;
             }
-            // Look to see if we should output an image
+
+            // ----- Look to see if we should output an image
             if(time >= nextImageTime){
                 writePositions();
                 nextImageTime += dtimage;
             }
-            // Look to see if we should give the user an update
+
+            // ----- Look to see if we should give the user an update
             if(time >= nextRealTime){
                 long now = System.currentTimeMillis();
                 percentComplete++;
@@ -1159,13 +1176,23 @@ public class MySystem {
             }
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(time/(totalTime + dt), time), VCellMessaging.ThrowOnException.NO); // progress message are throttled by vcellMessaging
 
+            // the expensive part of the simulation, update the system and relax the springs
+            long iterStart = System.nanoTime();
             time += dt;
             update();
             if(relaxationSteps > 2){
                 relaxSprings(relaxationSteps);
             }
+            long iterEnd = System.nanoTime();
+            long iterDuration = iterEnd - iterStart;
 
-        }
+            // gather the special statistics for multiple runs, compute them only inside run 1
+            if(runCounter == 1 && !etaTracker.isDisabled()) {
+                etaTracker.updateIterationStats(iterDuration);
+                etaTracker.maybeLog(System.currentTimeMillis(), totalSteps, lg);
+            }
+
+        }   // end of main simulation while loop
 
         stopTime = System.currentTimeMillis();
         try(PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "RunningTime.txt")))){
@@ -1173,6 +1200,10 @@ public class MySystem {
         } catch (IOException e) {
             lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
+
+        // TODO: Write last ETA snapshot and real duration to file that will be used by watchdog
+        //  use etaTracker.getLastSnapshot() and etaTracker.getTotalDuration()
+
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
         this.writeSiteIDs();

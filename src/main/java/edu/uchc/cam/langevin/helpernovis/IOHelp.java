@@ -222,7 +222,145 @@ public class IOHelp {
         
         return sb.toString();
     }
-    
+
+    /*
+     * This method takes a time in nanoseconds and formats it into a human-readable output
+     * for durations ranging from microseconds up to weeks.
+     * Mirrors the semantics of formatTime() above, but for nanoseconds.
+     *
+     * Examples:
+     *      formatNanoseconds(500);                     // "500ns"
+     *      formatNanoseconds(12_000);                  // "12µs"
+     *      formatNanoseconds(8_000_000);               // "8ms"
+     *      formatNanoseconds(2_345_678_900L);          // "2s 345ms 678µs 900ns"
+     *      formatNanoseconds(3_600_000_000_000L);      // "1h"
+     *      formatNanoseconds(172_800_000_000_000L);    // "2d"
+     */
+    public static String formatNanoseconds(long ns) {
+        if (ns < 0) {
+            return "0ns";
+        }
+
+        final long NS_PER_US = 1_000L;
+        final long NS_PER_MS = 1_000_000L;
+        final long NS_PER_SEC = 1_000_000_000L;
+        final long NS_PER_MIN = NS_PER_SEC * 60;
+        final long NS_PER_HOUR = NS_PER_MIN * 60;
+        final long NS_PER_DAY = NS_PER_HOUR * 24;
+
+        long days = ns / NS_PER_DAY;
+        ns %= NS_PER_DAY;
+
+        long hours = ns / NS_PER_HOUR;
+        ns %= NS_PER_HOUR;
+
+        long minutes = ns / NS_PER_MIN;
+        ns %= NS_PER_MIN;
+
+        long seconds = ns / NS_PER_SEC;
+        ns %= NS_PER_SEC;
+
+        long millis = ns / NS_PER_MS;
+        ns %= NS_PER_MS;
+
+        long micros = ns / NS_PER_US;
+        ns %= NS_PER_US;
+
+        long nanos = ns;
+
+        StringBuilder sb = new StringBuilder();
+
+        if (days > 0) sb.append(days).append("d ");
+        if (hours > 0) sb.append(hours).append("h ");
+        if (minutes > 0) sb.append(minutes).append("m ");
+        if (seconds > 0) sb.append(seconds).append("s ");
+        if (millis > 0) sb.append(millis).append("ms ");
+        if (micros > 0) sb.append(micros).append("µs ");
+        if (nanos > 0 || sb.length() == 0) sb.append(nanos).append("ns");
+
+        return sb.toString().trim();
+    }
+
+    /*
+     * This method takes a time in nanoseconds and formats it into a human-readable output
+     * for durations ranging from microseconds up to weeks, but only includes the specified
+     * number of non-zero units in the output.
+     *
+     * Examples:
+     *      formatNanoseconds(1, 500);                     // "500ns"
+     *      formatNanoseconds(1, 12_000);                  // "12µs"
+     *      formatNanoseconds(1, 8_000_000);               // "8ms"
+     *      formatNanoseconds(1, 2_345_678_900L);          // "2s 345ms"
+     *      formatNanoseconds(1, 3_600_000_000_000L);      // "1h"
+     *      formatNanoseconds(1, 172_800_000_000_000L);    // "2d"
+     */
+    public static String formatNanoseconds(int positions, long ns) {
+        if (ns < 0) {
+            return "0ns";
+        }
+
+        final long NS_PER_US = 1_000L;
+        final long NS_PER_MS = 1_000_000L;
+        final long NS_PER_SEC = 1_000_000_000L;
+        final long NS_PER_MIN = NS_PER_SEC * 60;
+        final long NS_PER_HOUR = NS_PER_MIN * 60;
+        final long NS_PER_DAY = NS_PER_HOUR * 24;
+
+        long days = ns / NS_PER_DAY;
+        ns %= NS_PER_DAY;
+
+        long hours = ns / NS_PER_HOUR;
+        ns %= NS_PER_HOUR;
+
+        long minutes = ns / NS_PER_MIN;
+        ns %= NS_PER_MIN;
+
+        long seconds = ns / NS_PER_SEC;
+        ns %= NS_PER_SEC;
+
+        long millis = ns / NS_PER_MS;
+        ns %= NS_PER_MS;
+
+        long micros = ns / NS_PER_US;
+        ns %= NS_PER_US;
+
+        long nanos = ns;
+
+        // Ordered list of units
+        long[] values = {
+                days, hours, minutes, seconds, millis, micros, nanos
+        };
+
+        String[] labels = {
+                "d", "h", "m", "s", "ms", "µs", "ns"
+        };
+
+        // Find first non-zero unit
+        int first = 0;
+        while (first < values.length && values[first] == 0) {
+            first++;
+        }
+
+        // If everything is zero
+        if (first == values.length) {
+            return "0ns";
+        }
+
+        // Build output with exactly "positions" units
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+
+        for (int i = first; i < values.length && count < positions; i++) {
+            sb.append(values[i]).append(labels[i]);
+            if (count < positions - 1) sb.append(" ");
+            count++;
+        }
+
+        return sb.toString().trim();
+    }
+
+
+
     /*******************************************************************\
      *                    CHECK NEW VALUE METHODS                      *
      * We want to check the values of the various system parameters    *

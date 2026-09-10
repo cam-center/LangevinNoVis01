@@ -70,8 +70,8 @@ public class WatchCommand implements Callable<Integer> {
             System.err.println("Model file not found: " + modelFile);
             return 1;
         }
-        if(numRuns == null || numRuns <= 0) {
-            System.err.println("Number of runs must be a non-zero positive number. Found: " + numRuns);
+        if(numRuns == null || numRuns <= 1) {   // batch run requires at least 2 simulations (excluding the watchdog)
+            System.err.println("Number of simulations must be a positive number > 1. Found: " + numRuns);
             return 1;
         }
         if (watchdogTick == null || watchdogTick <= 0) {
