@@ -373,6 +373,8 @@ public class MySystemTest {
         }
     }
 
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     /*
      * We'll test a lengthy simulation with a lot of reactions, to see if the estimated duration is reasonable
      * Keep in mind that if molecules are being created and destroyed, the number of reactions will vary and the
@@ -444,6 +446,8 @@ public class MySystemTest {
         }
     }
 
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     /*
      * We have disabled the default schedule, and we want to make sure that the hardcoded schedule is used instead
      */
@@ -507,6 +511,8 @@ public class MySystemTest {
         }
     }
 
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     /*
      * We have disabled the hardcoded schedule, and we want to make sure that the default schedule is used instead
      */
@@ -575,6 +581,7 @@ public class MySystemTest {
 
     /*
      * We have totaly disabled the ETA computation, and we want to make sure that it is not computed at all
+     * This is fast, no need to disable it for github actions
      */
     @Test
     public void estimateDurationEtaDisabled() throws IOException {
