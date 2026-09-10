@@ -1088,7 +1088,7 @@ public class MySystem {
         // create log file immediately at startup for batch run
         // using the existence of runCounter == 1, which allows us to differentiate from single runs
         // this is what the watchdog will use when looking for stale log files
-        if (useOutputFile && runCounter == 1) {
+        if (useOutputFile && runCounter != 0) {
             try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), false))) {
                 p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
             } catch (IOException ioe) {
