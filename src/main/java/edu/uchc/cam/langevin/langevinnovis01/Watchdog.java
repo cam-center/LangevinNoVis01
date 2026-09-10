@@ -96,6 +96,10 @@ public class Watchdog {
 
         lg.info("Watchdog entering doWork()");
 
+        // TODO: we send just one of this to see what it does on the client side (eventually we'll use it for ETA maybe)
+        // vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
+
+
 //        long start = System.currentTimeMillis();
         long timeoutMillis = watchdogTimeout * 1000L;
         File log1 = new File(simulationFolder, simulationName + "1.log");
@@ -233,7 +237,8 @@ public class Watchdog {
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
         } else {
             lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
-            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
+            // reducing the spam for now by commenting out useless message
+//            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
         }
     }
 
