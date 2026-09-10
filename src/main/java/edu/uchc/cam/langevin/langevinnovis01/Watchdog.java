@@ -236,8 +236,8 @@ public class Watchdog {
             lastBatchPercent = batchPercent;
             vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
         } else {
-            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
             // reducing the spam for now by commenting out useless message
+//            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
 //            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
         }
     }
