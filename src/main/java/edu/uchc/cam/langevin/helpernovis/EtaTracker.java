@@ -6,12 +6,12 @@ import org.apache.logging.log4j.Logger;
 
 public class EtaTracker {
 
-    public static final Logger lg = LogManager.getLogger(MySystem.class);
+    public static final Logger lg = LogManager.getLogger(EtaTracker.class);
 
     // ----------------------------------------------------------------------
     // Configurable parameters (with defaults)
     // ----------------------------------------------------------------------
-    private static long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 1000L; // default 1 hour
+    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 1000L; // default 1 hour
     private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: 1 hour)
     private int[] etaHardcodedScheduleSeconds = {    // hardcoded schedule of when to log ETA (in seconds) configurable by user
             1,2,3,4,5,10,20,30,40,60
@@ -176,7 +176,7 @@ public class EtaTracker {
     // ----------------------------------------------------------------------
     // Maybe log ETA (if schedule and cutoff allow)
     // ----------------------------------------------------------------------
-    public void maybeLog(long nowMs, int totalSteps, Logger lg) {
+    public void maybeLog(long nowMs, long totalSteps, Logger lg) {
 
         if (nowMs < nextEtaTimeMs) {    // If we haven't reached the next ETA time, do nothing
             // also do nothing forever after cutoff, since nextEtaTimeMs will be set to Long.MAX_VALUE after cutoff
@@ -184,7 +184,8 @@ public class EtaTracker {
         }
 
         if (iterCount <= 10) {  // prevents garbage ETA estimates during warmup phase of the simulation
-            lg.info("ETA logging skipped: only " + iterCount + " iterations completed, skip warmup phase iterations.");
+            // TODO: some debugging is needed, apparently this never happens
+            lg.debug("ETA logging skipped: only " + iterCount + " iterations completed, skip warmup phase iterations.");
             return;
         }
 
@@ -199,7 +200,8 @@ public class EtaTracker {
 
         lastEtaTotalNs = (long)(meanIterTime * totalSteps);
         lastEtaRemainingNs = (long)(meanIterTime * (totalSteps - iterCount));
-        lastEtaLowNs = (long)((meanIterTime - ci) * (totalSteps - iterCount));
+        // meanIterTime - ci can be negative, so we need to clamp to 0 for the lower bound
+        lastEtaLowNs = Math.max(0L, (long)((meanIterTime - ci) * (totalSteps - iterCount)));
         lastEtaHighNs = (long)((meanIterTime + ci) * (totalSteps - iterCount));
 
         // Log ETA

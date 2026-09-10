@@ -1085,11 +1085,17 @@ public class MySystem {
         startTime = System.currentTimeMillis();
         etaTracker.initialize(startTime);
 
-        // create log file immediately at startup for batch run
-        // using the existence of runCounter == 1, which allows us to differentiate from single runs
-        // this is what the watchdog will use when looking for stale log files
+        // create fresh log file immediately at startup for all runs in the batch except for run #0
         if (useOutputFile && runCounter != 0) {
             try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), false))) {
+                p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
+            } catch (IOException ioe) {
+                lg.warn("Could not create initial log file: " + g.getOutputFile(), ioe);
+            }
+        } else if(useOutputFile && runCounter == 0) {
+            // we know for sure that the log file for run 0 was created at the start of the solver
+            // and we need the special preamble for single runs, so we can just append to it
+            try (PrintWriter p = new PrintWriter(new FileWriter(g.getOutputFile(), true))) {
                 p.println("Simulation 0% complete. Elapsed time: " + IOHelp.formatTime(startTime, startTime));
             } catch (IOException ioe) {
                 lg.warn("Could not create initial log file: " + g.getOutputFile(), ioe);
@@ -1105,7 +1111,7 @@ public class MySystem {
         double nextImageTime = dtimage;
         int relaxationSteps = (int)(dt/dtspring);
 
-        int totalSteps = (int)(totalTime / dt);
+        long totalSteps = (long)(totalTime / dt);
 
         // ------------------------------------------------------------------------------
 
@@ -1194,35 +1200,10 @@ public class MySystem {
         } catch (IOException e) {
             lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
-        // TODO: Write last ETA snapshot and real duration
-//        try (PrintWriter pw = new PrintWriter(new FileWriter(new File(dataFolder, "LastEstimate.txt")))) {
-//
-//            pw.println("Real Running Time: " + IOHelp.formatTime(startTime, stopTime));
-//            pw.println("Real Running Time (ns): " + (stopTime - startTime) * 1_000_000L);
-//
-//            if (lastEtaTimeMs > 0) {
-//                pw.println();
-//                pw.println("Last ETA snapshot:");
-//                pw.println("  ETA computed at: " + IOHelp.formatTime(startTime, lastEtaTimeMs));
-//                pw.println("  Progress at ETA: " + String.format("%.4f", lastEtaProgress * 100) + "%");
-//
-//                pw.println("  Estimated Total Runtime: " + IOHelp.formatNanoseconds(lastEtaTotalNs));
-//                pw.println("  Estimated Remaining Runtime: " + IOHelp.formatNanoseconds(lastEtaRemainingNs));
-//                pw.println("  Confidence Interval: [" +
-//                        IOHelp.formatNanoseconds(lastEtaLowNs) + " .. " +
-//                        IOHelp.formatNanoseconds(lastEtaHighNs) + "]");
-//
-//                long realNs = (stopTime - startTime) * 1_000_000L;
-//                pw.println();
-//                pw.println("Difference between ETA total and real: " +
-//                        IOHelp.formatNanoseconds(realNs - lastEtaTotalNs));
-//            } else {
-//                pw.println("No ETA snapshot was computed (simulation finished before first ETA).");
-//            }
-//
-//        } catch (IOException e) {
-//            lg.error("Failed to write file 'LastEstimate.txt' in: " + dataFolder.getAbsolutePath(), e);
-//        }
+
+        // TODO: Write last ETA snapshot and real duration to file that will be used by watchdog
+        //  use etaTracker.getLastSnapshot() and etaTracker.getTotalDuration()
+
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
         this.writeSiteIDs();

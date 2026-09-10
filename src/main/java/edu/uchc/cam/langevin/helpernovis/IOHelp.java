@@ -238,7 +238,7 @@ public class IOHelp {
      */
     public static String formatNanoseconds(long ns) {
         if (ns < 0) {
-            return "0 ns";
+            return "0ns";
         }
 
         final long NS_PER_US = 1_000L;
@@ -292,7 +292,7 @@ public class IOHelp {
      *      formatNanoseconds(1, 8_000_000);               // "8ms"
      *      formatNanoseconds(1, 2_345_678_900L);          // "2s 345ms"
      *      formatNanoseconds(1, 3_600_000_000_000L);      // "1h"
-     *      formatNanoseconds(1, 172_800_000_000_000L);    // "2d 0h"
+     *      formatNanoseconds(1, 172_800_000_000_000L);    // "2d"
      */
     public static String formatNanoseconds(int positions, long ns) {
         if (ns < 0) {
@@ -356,7 +356,7 @@ public class IOHelp {
             count++;
         }
 
-        return sb.toString();
+        return sb.toString().trim();
     }
 
 

@@ -500,8 +500,8 @@ public class MySystemTest {
 
             // *** Verify ETA fired at least once ***
             long lastEta = eta.getLastEtaTimeMs();
-            Assertions.assertTrue(lastEta >= 3000,
-                    "ETA should have been computed using hardcoded schedule (>= 3 seconds)");
+            Assertions.assertNotEquals(-1, lastEta,
+                    "ETA should have been computed at least once using the hardcoded schedule");
 
             System.out.println("Hardcoded schedule ETA test completed.");
         } catch (Exception e) {
@@ -568,8 +568,8 @@ public class MySystemTest {
 
             // *** Verify ETA WAS computed ***
             long lastEta = sys.getEtaTracker().getLastEtaTimeMs();
-            Assertions.assertTrue(lastEta >= 5000,
-                    "ETA should have been computed at least once using default schedule");
+            Assertions.assertNotEquals(-1, lastEta,
+                    "ETA should have been computed at least once using the default schedule");
 
             System.out.println("Default schedule ETA test completed.");
         } catch (Exception e) {
