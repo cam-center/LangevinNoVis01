@@ -24,4 +24,7 @@ public record WorkerEvent(
     public static WorkerEvent workerAliveEvent() {
         return new WorkerEvent(WorkerStatus.JOB_WORKER_ALIVE, 0.0, 0.0, "");
     }
+    public static WorkerEvent workerAliveEvent(String eventMessage) {
+        return new WorkerEvent(WorkerStatus.JOB_WORKER_ALIVE, 0.0, 0.0, eventMessage);
+    }
 }
