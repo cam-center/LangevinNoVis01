@@ -1083,7 +1083,10 @@ public class MySystem {
         lg.debug("This stdout file is associated with run counter " + runCounter + ".");
         lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
-        etaTracker.initialize(startTime);
+
+        // Initialize the ETA tracker for this run.
+        // We only want to track ETA for run 1, initialize() will disable tracking for any other run.
+        etaTracker.initialize(runCounter, startTime);
 
         // create fresh log file immediately at startup for all runs in the batch except for run #0
         if (useOutputFile && runCounter != 0) {

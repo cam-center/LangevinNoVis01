@@ -11,14 +11,25 @@ public class EtaTracker {
     // ----------------------------------------------------------------------
     // Configurable parameters (with defaults)
     // ----------------------------------------------------------------------
-    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 1000L; // default 1 hour
-    private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: 1 hour)
+    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 14 * 1000L; // default 14 hours
+    private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: see above)
+
     private int[] etaHardcodedScheduleSeconds = {    // hardcoded schedule of when to log ETA (in seconds) configurable by user
-            1,2,3,4,5,10,20,30,40,60
+            2,4,10,20,40,60,120,
+            300,    // 5 minutes
+            600,    // 10 minutes
+            1800,   // 30 minutes
+            3600,   // 1 hour
+            7200,   // 2 hours
+            14400,  // 4 hours
+            28800,  // 8 hours
+            43200   // 12 hours
     };
+
+    private long defaultScheduleIntervalMs = 60 * 60 * 4 * 1000L;   // default schedule interval (4 hours) after hardcoded schedule ends
+
     private boolean bUseHardcodedSchedule = true;   // use hardcoded schedule (true) or not (false)
     private boolean bUseDefaultSchedule = false;     // use default schedule (true) or not (false)
-    private long defaultScheduleIntervalMs = 60_000L;   // default schedule interval (1 minute) after hardcoded schedule ends
 
     // ----------------------------------------------------------------------
     // Internal scheduling state
@@ -56,7 +67,13 @@ public class EtaTracker {
     // ----------------------------------------------------------------------
     // Initialize tracker for a new run
     // ----------------------------------------------------------------------
-    public void initialize(long startTimeMs) {
+    public void initialize(int runCounter, long startTimeMs) {
+
+        // we disable the tracker entirely if runCounter != 1 (only run 1 is tracked)
+        if(runCounter != 1) {
+            bUseHardcodedSchedule = false;
+            bUseDefaultSchedule = false;
+        }
 
         this.startTimeMs = startTimeMs;
         this.etaLoggingCutoffMs = startTimeMs + DEFAULT_ETA_LOGGING_CUTOFF_MS;
@@ -96,8 +113,7 @@ public class EtaTracker {
                 throw new IllegalStateException("Hardcoded schedule enabled but no schedule array provided.");
             }
             nextEtaTimeMs = startTimeMs + etaHardcodedScheduleSeconds[0] * 1000L;
-            lg.info("Initialize: ETA logging using hardcoded schedule only. " +
-                    "First ETA at " + (nextEtaTimeMs - startTimeMs) + "ms.");
+            lg.info("Initialize: ETA logging using hardcoded schedule only. " + "First ETA computed at " + (nextEtaTimeMs - startTimeMs) + "ms.");
             return;
         }
 
@@ -108,7 +124,7 @@ public class EtaTracker {
                                 "cutoff=" + DEFAULT_ETA_LOGGING_CUTOFF_MS + "ms, interval=" + defaultScheduleIntervalMs + "ms.");
             }
             nextEtaTimeMs = startTimeMs + defaultScheduleIntervalMs;
-            lg.info("Initialize: ETA logging using default schedule only. " + "First ETA at " + (nextEtaTimeMs - startTimeMs) + "ms.");
+            lg.info("Initialize: ETA logging using default schedule only. " + "First ETA computed at " + (nextEtaTimeMs - startTimeMs) + "ms.");
             return;
         }
 
@@ -127,7 +143,7 @@ public class EtaTracker {
                                 etaHardcodedScheduleSeconds[etaHardcodedScheduleSeconds.length - 1] * 1000L + "ms) when both schedules are enabled.");
             }
             nextEtaTimeMs = startTimeMs + etaHardcodedScheduleSeconds[0] * 1000L;
-            lg.info("Initialize: ETA logging using hardcoded schedule first, then default schedule. First ETA at " + (nextEtaTimeMs - startTimeMs) + "ms.");
+            lg.info("Initialize: ETA logging using hardcoded schedule first, then default schedule. First ETA computed at " + (nextEtaTimeMs - startTimeMs) + "ms.");
             return;
         }
         // Should never reach here
@@ -162,6 +178,7 @@ public class EtaTracker {
     // Update iteration statistics
     // ----------------------------------------------------------------------
     public void updateIterationStats(long iterDurationNs) {
+
         iterCount++;
 
         if (iterDurationNs < minIterTime) minIterTime = iterDurationNs;
@@ -183,8 +200,7 @@ public class EtaTracker {
             return;
         }
 
-        if (iterCount <= 10) {  // prevents garbage ETA estimates during warmup phase of the simulation
-            // TODO: some debugging is needed, apparently this never happens
+        if (iterCount < 10) {  // prevents garbage ETA estimates during warmup phase of the simulation
             lg.debug("ETA logging skipped: only " + iterCount + " iterations completed, skip warmup phase iterations.");
             return;
         }
