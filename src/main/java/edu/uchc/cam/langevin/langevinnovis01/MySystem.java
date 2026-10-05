@@ -1084,9 +1084,20 @@ public class MySystem {
         lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
 
+        lg.debug("Default Global Folder: " + g.getDefaultFolder());
+        lg.debug("Global Input File: " + g.getInputFile());
+        lg.debug("MySystem Folder: " + folder);
+        lg.debug("MySystem Data Folder: " + dataFolder);
+
         // Initialize the ETA tracker for this run.
         // We only want to track ETA for run 1, initialize() will disable tracking for any other run.
-        etaTracker.initialize(runCounter, startTime);
+        try {
+            etaTracker.initialize(g, runCounter, startTime);
+        } catch (Exception ex) {
+            lg.error("ETA tracker initialization failed, disabling ETA for this run.", ex);
+            etaTracker.setUseHardcodedSchedule(false);
+            etaTracker.setUseDefaultSchedule(false);
+        }
 
         // create fresh log file immediately at startup for all runs in the batch except for run #0
         if (useOutputFile && runCounter != 0) {

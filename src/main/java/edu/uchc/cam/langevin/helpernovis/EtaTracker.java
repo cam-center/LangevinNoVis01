@@ -1,8 +1,11 @@
 package edu.uchc.cam.langevin.helpernovis;
 
+import edu.uchc.cam.langevin.langevinnovis01.Global;
 import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import java.io.File;
 
 public class EtaTracker {
 
@@ -57,22 +60,36 @@ public class EtaTracker {
     private long   lastEtaHighNs      = -1;   // upper confidence bound (ns)
     private double lastEtaProgress    = -1.0; // progress fraction at last snapshot
 
+    // the watchdog will read this file to send early ETA to the user, long simulations may take weeks
+    private File etaFile = null;
+
     // ----------------------------------------------------------------------
     // Constructor
     // ----------------------------------------------------------------------
     public EtaTracker() {
-        // Nothing to do here
     }
 
     // ----------------------------------------------------------------------
     // Initialize tracker for a new run
     // ----------------------------------------------------------------------
-    public void initialize(int runCounter, long startTimeMs) {
+    public void initialize(Global g, int runCounter, long startTimeMs) {
 
         // we disable the tracker entirely if runCounter != 1 (only run 1 is tracked)
         if(runCounter != 1) {
             bUseHardcodedSchedule = false;
             bUseDefaultSchedule = false;
+        }
+
+        // we initialize the eta tracker output file, which will be read by the watchdog to send early ETA to the user
+        if(runCounter == 1) {
+            String simulationName  = g.getInputFile().getName();
+            int dotIndex = simulationName.lastIndexOf('.');     // Strip extension off the file name
+            if (dotIndex > 0) {
+                simulationName = simulationName.substring(0, dotIndex);
+            } else {
+                throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
+            }
+            etaFile = new File(g.getDefaultFolder(), simulationName + ".eta");
         }
 
         this.startTimeMs = startTimeMs;
@@ -150,10 +167,10 @@ public class EtaTracker {
         throw new IllegalStateException("Invalid ETA configuration.");
     }
 
+
     public boolean isDisabled() {
         return bUseHardcodedSchedule == false && bUseDefaultSchedule == false;
     }
-
 
     // ----------------------------------------------------------------------
     // Setters for tests

@@ -32,6 +32,7 @@ public class Watchdog {
     private String simulationName;      // model / simulation name (without extension)
     private File simulationFolder;      // top folder, where the input file is (and also the .ida and ,json files are)
 
+    private File etaFile;               // file where the ETA is written by simulation 1
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
                     int watchdogTick, int watchdogTimeout) {
@@ -73,22 +74,23 @@ public class Watchdog {
         lastModifiedSeen = new long[numRuns];
         lastBatchPercent = 0;
 
+        simulationFolder = g.getDefaultFolder();
+
         File inputFile = g.getInputFile();      // model / simulation input file (the .langevininput file)
         simulationName = inputFile.getName();
-        lg.info("Watchdog analyzing input file for simulation: " + simulationName);
-
-        String filePath = inputFile.getAbsolutePath();
-        filePath = filePath.substring(0, filePath.length() - simulationName.length());  // Strip the file name off of the path
-        simulationFolder = new File(filePath);
-
         int dotIndex = simulationName.lastIndexOf('.');     // Strip extension off the file name
         if (dotIndex > 0) {
             simulationName = simulationName.substring(0, dotIndex);
         } else {
             throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
         }
+
+        File etaFile = new File(simulationFolder, simulationName + ".eta");
+
         lg.info("Working folder : " + simulationFolder.getAbsolutePath());
         lg.info("Simulation name: " + simulationName);
+        lg.info("Input file name: " + inputFile.getName());
+        lg.info("ETA file name  : " + etaFile.getName());   // ex: SimID_123456789_0_.eta
     }
 
 

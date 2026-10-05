@@ -125,10 +125,15 @@ public class Global {
             throw new IOException("Failed to read input file: " + inputFile.getAbsolutePath(), e);
         } 
     }
-    
-    /* *************** GET THE OUTPUT FILE *******************************/
+
+    public File getInputFile(){
+        return inputFile;
+    }
     public File getOutputFile(){
         return outputFile;
+    }
+    public File getDefaultFolder(){
+        return defaultFolder;
     }
     
     /* ************* COUNT CLUSTERS BOOLEAN *******************************/
@@ -234,12 +239,7 @@ public class Global {
         }
         return reactions;
     }
-    
-    public File getInputFile(){
-        return inputFile;
-    }
 
-    
     /* ******************************************************************\
      *                   METHODS TO HANDLE NAME HASHMAPS                *
     \********************************************************************/
