@@ -24,6 +24,7 @@ public class Watchdog {
     private final int watchdogTick;
     private final int watchdogTimeout;
 
+    // used internally in updateProgress() and updateEta()
     long watchdogStartTime;             // time when the watchdog started, used for timeout calculations
     private int[] latestPercent;        // latest percent for each run
     private long[] lastModifiedSeen;    // last modified timestamp we last processed
@@ -33,6 +34,14 @@ public class Watchdog {
     private File simulationFolder;      // top folder, where the input file is (and also the .ida and ,json files are)
 
     private File etaFile;               // file where the ETA is written by simulation 1
+
+    // flags to indicate if we need to send a progress / ETA event
+    // this is the "ready to send" stuff we use in the while loop
+    // they are computed / set in updateProgress() and updateEta()
+    boolean etaChanged = false;
+    boolean progressChanged = false;
+    double lastEta = 0.0;
+    double lastProgress = 0.0;
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
                     int watchdogTick, int watchdogTimeout) {
@@ -143,36 +152,42 @@ public class Watchdog {
                 throw new RuntimeException("Watchdog interrupted: ", e);
             }
         }
-
+        // --------------------------------------------------------------------------------
         // now we start a new loop where we check for progress.
         // at watchdog tick intervals, we check the log file for new lines.
         // If we don't see any new lines we just send a worker alive event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(...
         // if we see any new lines we calculate progress and send progress event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(.......), VCellMessaging.ThrowOnException.NO);
+        // --------------------------------------------------------------------------------
         lg.info("Watchdog entering progress monitoring loop for simulation: " + simulationName);
         vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - watchdogStartTime), VCellMessaging.ThrowOnException.NO);
+
 
         long lastTick = System.currentTimeMillis();
         while (true) {
 
-            // TODO: someday in the future we will also look for ETA estimator
-
             long now = System.currentTimeMillis();
-            long elapsed = (now - lastTick) / 1000L;
+            long elapsedSinceLastTick = (now - lastTick) / 1000L;
+            long elapsedSinceStart = (now - watchdogStartTime) / 1000L;
 
             // Log that we are alive inside the second loop
-            lg.info("Watchdog progress loop tick — elapsed " + elapsed + " seconds since last tick");
+            lg.info("Watchdog progress loop tick — elapsed " + elapsedSinceLastTick + " seconds since last tick");
 
-            // Reset tick timer
-            lastTick = now;
+            etaChanged = false;
+            progressChanged = false;
+            lastTick = now;     // reset tick timer
 
-            update();
+            etaChanged = updateEta();
+            progressChanged = updateProgress();
 
-            // Sleep for watchdogTick seconds
-            try {
-                // TODO: consider using a ScheduledExecutorService instead of Thread.sleep() for better timing accuracy and interrupt handling
-                // TODO: we may want to adjust the sleep duration based on the ETA estimation to avoid spamming the messaging system and / or the log
+            if(etaChanged || progressChanged) {
+                // TODO: we will send both progress and ETA in the same event if either changed
+                // for now we send progress
+                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
+            }
+
+            try {                   // --------------------------- sleep for watchdogTick seconds
                 Thread.sleep(watchdogTick * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -182,10 +197,13 @@ public class Watchdog {
         }
     }
 
+    private boolean updateEta() {
+        return false;  // TODO: implement ETA estimation logic
+    }
     // -----------------------------------------------------------------------------------
     // this is where we will read the log files and send progress events to vcellMessaging
     // -----------------------------------------------------------------------------------
-    private void update() {
+    private boolean updateProgress() {
 
         int sum = 0;
 
@@ -229,18 +247,17 @@ public class Watchdog {
 
         double batchPercent = (double)sum / (double)numRuns;
 
-        double now = System.currentTimeMillis();
-        double elapsed = now - watchdogStartTime;
-
         // Compare with previous tick
         if (batchPercent != lastBatchPercent) {
             lg.info(String.format("Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
-            lastBatchPercent = batchPercent;
-            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
+            lastBatchPercent = batchPercent;        // this is used internally, here in updateProgress()
+            lastProgress = lastBatchPercent/100;    // this is what we send in the event
+            return true;  // progress changed
+
         } else {
             // reducing the spam for now by commenting out useless message
 //            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
-            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
+            return false;  // no progress change
         }
     }
 
