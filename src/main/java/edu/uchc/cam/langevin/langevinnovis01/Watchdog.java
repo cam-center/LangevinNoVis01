@@ -1,12 +1,12 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.helpernovis.SolverConstants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.WorkerEvent;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -24,11 +24,14 @@ public class Watchdog {
     private final int watchdogTick;
     private final int watchdogTimeout;
 
-    // used internally in updateProgress() and updateEta()
+    // used internally in updateProgress()
     long watchdogStartTime;             // time when the watchdog started, used for timeout calculations
     private int[] latestPercent;        // latest percent for each run
     private long[] lastModifiedSeen;    // last modified timestamp we last processed
     private double lastBatchPercent;    // percent at previous tick
+
+    // used internally in updateEta()
+    private long lastEtaModSeen = 0L;
 
     private String simulationName;      // model / simulation name (without extension)
     private File simulationFolder;      // top folder, where the input file is (and also the .ida and ,json files are)
@@ -40,7 +43,7 @@ public class Watchdog {
     // they are computed / set in updateProgress() and updateEta()
     boolean etaChanged = false;
     boolean progressChanged = false;
-    double lastEta = 0.0;
+    double estimatedTotalSec = 0.0;      // this is total simulation duration, not time remaining!
     double lastProgress = 0.0;
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
@@ -197,12 +200,98 @@ public class Watchdog {
         }
     }
 
+    // -----------------------------------------------------------------------------------
+    // this is where we read the ETA file and update the lastEta value
+    // -----------------------------------------------------------------------------------
     private boolean updateEta() {
-        return false;  // TODO: implement ETA estimation logic
+
+        if (etaFile == null || !etaFile.exists()) {     // If ETA file does not exist, nothing to do
+            return false;
+        }
+        long lastMod = etaFile.lastModified();
+        if (lastMod < watchdogStartTime) {              // Ignore stale ETA (from previous runs)
+            return false;
+        }
+        if (lastMod <= lastEtaModSeen) {                // No new ETA since last tick
+            return false;
+        }
+
+        // --- Read only the tail of the file (like the log parser) ---
+        String lastLine = null;
+        try (RandomAccessFile raf = new RandomAccessFile(etaFile, "r")) {
+
+            long fileLength = raf.length();
+            long seekPos = Math.max(0, fileLength - 2048);   // read last ~2KB
+            raf.seek(seekPos);
+
+            String line;
+            while ((line = raf.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    lastLine = line.trim();   // keep overwriting -> last non-empty line
+                }
+            }
+
+        } catch (Exception ex) {
+            lg.warn("Failed to read ETA file tail " + etaFile + ": " + ex.getMessage());
+            return false;
+        }
+
+        if (lastLine == null) {
+            return false;   // empty file
+        }
+
+        // --- Parse the last ETA record ---
+        // Format: totalSec=123, confidence=850, timestampSec=1727890
+        int totalSec = -1;
+        int confidence = -1;
+        int timestampSec = -1;
+
+        try {
+            String[] parts = lastLine.split(",");
+            for (String part : parts) {
+                String[] kv = part.trim().split("=");
+                if (kv.length != 2) continue;
+
+                String key = kv[0].trim();
+                String val = kv[1].trim();
+
+                switch (key) {
+                    case SolverConstants.EtaEstimatedTotalSec:
+                        totalSec = Integer.parseInt(val);
+                        break;
+                    case SolverConstants.EtaConfidence:
+                        confidence = Integer.parseInt(val);
+                        break;
+                    case SolverConstants.EtaTimestampSec:
+                        timestampSec = Integer.parseInt(val);
+                        break;
+                }
+            }
+        } catch (Exception ex) {
+            lg.warn("Failed to parse ETA line '" + lastLine + "': " + ex.getMessage());
+            return false;
+        }
+
+        // Validate
+        if (totalSec <= 0 || timestampSec <= 0) {
+            lg.warn("Invalid ETA record: " + lastLine);
+            return false;
+        }
+
+        // Update internal state
+        estimatedTotalSec = totalSec;   // this is what we send in the event
+        lastEtaModSeen = lastMod;
+
+        lg.info("ETA changed: estimatedTotalSec=" + estimatedTotalSec +
+                ", confidence=" + confidence +
+                ", timestampSec=" + timestampSec);
+
+        return true;    // ETA changed
     }
-    // -----------------------------------------------------------------------------------
-    // this is where we will read the log files and send progress events to vcellMessaging
-    // -----------------------------------------------------------------------------------
+
+    // -----------------------------------------------------------------------------------------------------
+    // this is where we read the log files and compute the overall progress percentage for the batch of runs
+    // -----------------------------------------------------------------------------------------------------
     private boolean updateProgress() {
 
         int sum = 0;

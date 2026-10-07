@@ -1,11 +1,11 @@
 package edu.uchc.cam.langevin.helpernovis;
 
 import edu.uchc.cam.langevin.langevinnovis01.Global;
-import edu.uchc.cam.langevin.langevinnovis01.MySystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.File;
+import java.io.FileWriter;
 
 public class EtaTracker {
 
@@ -244,6 +244,8 @@ public class EtaTracker {
                 ", CI=[" + IOHelp.formatNanoseconds(2, lastEtaLowNs) + " .. " +
                 IOHelp.formatNanoseconds(2, lastEtaHighNs) + "]");
 
+        writeEtaSnapshot(lg);
+
         advanceSchedule();
     }
 
@@ -301,7 +303,7 @@ public class EtaTracker {
     }
 
     // ----------------------------------------------------------------------
-    // Getters for last snapshot
+    // Getters for last snapshot (mostly unused, or used in some @Tests)
     // ----------------------------------------------------------------------
     public long getLastEtaTimeMs() { return lastEtaTimeMs; }
     public long getLastEtaTotalNs() { return lastEtaTotalNs; }
@@ -316,4 +318,33 @@ public class EtaTracker {
     public long getMaxIterTime() { return maxIterTime; }
     public double getMeanIterTime() { return meanIterTime; }
     public double getVariance() { return (iterCount > 1) ? (m2 / (iterCount - 1)) : 0.0; }
+
+
+    private void writeEtaSnapshot(Logger lg) {
+        if (etaFile == null) {
+            lg.warn("ETA file not initialized, cannot write ETA snapshot.");
+            return;
+        }
+
+        try (FileWriter fw = new FileWriter(etaFile, true)) {   // append mode
+
+            // Convert nanoseconds → integer seconds
+            int totalSec     = (int)(lastEtaTotalNs / 1_000_000_000L);
+            int timestampSec = (int)(lastEtaTimeMs / 1000L);
+
+            // Confidence: simple integer 0–1000 (you can refine later)
+            int confidence = (int)(Math.min(1.0, Math.max(0.0, lastEtaProgress)) * 1000);
+
+            fw.write(String.format(
+                    "%s=%d, %s=%d, %s=%d%n",
+                    SolverConstants.EtaEstimatedTotalSec,     totalSec,
+                    SolverConstants.EtaConfidence,   confidence,
+                    SolverConstants.EtaTimestampSec, timestampSec
+            ));
+
+        } catch (Exception ex) {
+            lg.warn("Failed to write ETA snapshot: " + ex.getMessage());
+        }
+    }
+
 }
