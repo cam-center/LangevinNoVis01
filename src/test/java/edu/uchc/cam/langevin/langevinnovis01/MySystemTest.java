@@ -2,6 +2,7 @@ package edu.uchc.cam.langevin.langevinnovis01;
 
 import edu.uchc.cam.langevin.helpernovis.EtaTracker;
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
+import edu.uchc.cam.langevin.helpernovis.SolverConstants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
@@ -449,7 +450,9 @@ public class MySystemTest {
     // do not run on github actions, it's somewhat long
     @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     /*
-     * We have disabled the default schedule, and we want to make sure that the hardcoded schedule is used instead
+     * We have disabled the default schedule, and we want to make sure that the hardcoded schedule is used
+     * We also test that the .eta file is being created and contains the expected fields,
+     * and that the ETA is being computed at least once
      */
     @Test
     public void estimateDurationHardcodedScheduleOnly() throws IOException {
@@ -467,10 +470,11 @@ public class MySystemTest {
         Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
         Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
         Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+        Path etaFile = tempDirectory.resolve(sim_base_name + ".eta");   // eta file is unique, no _1
 
-        // Make simulation run long enough to hit 1s, 2s, 3s ETA points
-        inputFileContents = setInitialValue(inputFileContents, "MT0", 40);
-        inputFileContents = setInitialValue(inputFileContents, "MT1", 40);
+        // Make simulation run long enough to hit a few ETA points
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 80);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 80);
 
         Files.writeString(modelFile, inputFileContents);
 
@@ -488,15 +492,27 @@ public class MySystemTest {
             EtaTracker eta = sys.getEtaTracker();
 
             // *** Hardcoded schedule only ***
-            eta.setEtaHardcodedScheduleSeconds(new int[] {1, 2, 3, 6, 12, 20});     // ETA at 1s, 2s, 3s...
+            eta.setEtaHardcodedScheduleSeconds(new int[] {2, 4, 6, 8, 12, 16, 20});     // ETA at xs, ys, zs...
             eta.setUseDefaultSchedule(false);   // disable fallback
             eta.setEtaLoggingCutoffMs(10_000);  // IRRELEVANT! fallback is disabled, we stop after the hardcoded schedule
 
             // Run simulation
             sys.runSystem();
 
-            // Simulation must produce output
+            // Simulation must produce output IDA file
             Assertions.assertTrue(Files.exists(idaFile));
+
+            // Simulation 1 must produce ETA file, and it must contain the expected fields
+            Assertions.assertTrue(Files.exists(etaFile), "ETA file should have been created by the ETA tracker");
+            Assertions.assertTrue(Files.size(etaFile) > 0, "ETA file should not be empty");
+
+            String etaContents = Files.readString(etaFile);
+            Assertions.assertTrue(etaContents.contains(SolverConstants.EtaEstimatedTotalSec),
+                    "ETA file must contain field: " + SolverConstants.EtaEstimatedTotalSec);
+            Assertions.assertTrue(etaContents.contains(SolverConstants.EtaConfidence),
+                    "ETA file must contain field: " + SolverConstants.EtaConfidence);
+            Assertions.assertTrue(etaContents.contains(SolverConstants.EtaTimestampSec),
+                    "ETA file must contain field: " + SolverConstants.EtaTimestampSec);
 
             // *** Verify ETA fired at least once ***
             long lastEta = eta.getLastEtaTimeMs();

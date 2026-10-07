@@ -373,7 +373,7 @@ public class CliTest {
 
     /*
      * Exercising the --watchdog-timeout argument differently:
-     * There is only a stale log file for run 1, which means simulation 0 never starts for the current batch run
+     * There is only a stale log file for run 1, which means simulation 1 never starts for the current batch run
      * Normally it should start rather quickly and create a fresh log file
      * Nevertheless, we'll give it a generous timeout in production code to account for the fact that slurm may need
      * to delay it a lot if the node is too busy
