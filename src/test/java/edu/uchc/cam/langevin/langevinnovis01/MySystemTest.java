@@ -1,5 +1,6 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.cli.CliMain;
 import edu.uchc.cam.langevin.helpernovis.EtaTracker;
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
 import edu.uchc.cam.langevin.helpernovis.SolverConstants;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.VCellMessagingLocal;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
@@ -654,6 +656,97 @@ public class MySystemTest {
             deleteDirectory(tempDirectory.toFile());
         }
     }
+
+    // ------------------------------------------------------------------------------------
+    // do not run on github actions, it's somewhat long
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * Testing the ETA tracker and watchdog functionality, ensuring that the ETA is computed correctly and
+     * that the watchdog mechanism reads it properly
+     */
+    @Test
+    public void testETATrackerAndWatchdog() throws IOException {
+        String sim_base_name = "SimID_123456789_0_";
+        int runCounter = 1;
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_eta_and_watchdog");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+        Path etaFile = tempDirectory.resolve(sim_base_name + ".eta");   // eta file is unique, no _1
+
+        // Make simulation run long enough to hit a few ETA points
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 40);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 40);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            // Start the watchdog in a separate thread, which will monitor the ETA file and ensure that the simulation is progressing
+            String[] args = {
+                    "watchdog",
+                    modelFile.toString(),
+                    "3",                        // numRuns = 1 for this test
+                    "--watchdog-tick", "2",     // check every 2 seconds
+                    "--watchdog-timeout", "60", // generous timeout
+                    "--vc-print-status"         // uses VCellMessagingLocal
+            };
+            CommandLine cmd = new CommandLine(new CliMain());
+            Thread watchdogThread = new Thread(() -> cmd.execute(args));    // Run watchdog in a separate thread
+            watchdogThread.start();
+
+
+            // Run the simulation in its own thread
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            EtaTracker eta = sys.getEtaTracker();
+            eta.setEtaHardcodedScheduleSeconds(new int[] {3, 6, 9, 12, 15, 18, 21});     // ETA at xs, ys, zs...
+            eta.setUseDefaultSchedule(false);   // disable fallback
+
+            MySystem finalSys = sys;
+            Thread simulationThread = new Thread(() -> {
+                try {
+                    finalSys.runSystem();
+                } catch (Exception ex) {
+                    throw new RuntimeException("Simulation thread failed", ex);
+                }
+            });
+            simulationThread.start();
+
+            // --- Wait for simulation to finish ---
+            simulationThread.join();
+
+            // --- Stop watchdog (it won't stop by itself) ---
+            watchdogThread.interrupt();
+            watchdogThread.join(2000);   // give it 2 seconds to exit
+
+
+            Assertions.assertTrue(Files.exists(idaFile));   // Simulation must produce IDA and ETA files
+            Assertions.assertTrue(Files.exists(etaFile), "ETA file should have been created by the ETA tracker");
+
+
+            System.out.println("Watchdog and ETA test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
 
     // ----------------------------------------------------------------------------------
 

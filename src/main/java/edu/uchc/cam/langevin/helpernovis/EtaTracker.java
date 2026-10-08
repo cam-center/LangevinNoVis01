@@ -335,6 +335,8 @@ public class EtaTracker {
             // Confidence: simple integer 0–1000 (you can refine later)
             int confidence = (int)(Math.min(1.0, Math.max(0.0, lastEtaProgress)) * 1000);
 
+            // we don't really use the confidence right now, but we could do some sanity checks in the watchdog, look for drift, etc
+            // we don't use the timestamp right now, the watchdog own timestamp is authoritative, but we may want to use it for sanity checks in the future
             fw.write(String.format(
                     "%s=%d, %s=%d, %s=%d%n",
                     SolverConstants.EtaEstimatedTotalSec,     totalSec,

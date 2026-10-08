@@ -43,7 +43,7 @@ public class Watchdog {
     // they are computed / set in updateProgress() and updateEta()
     boolean etaChanged = false;
     boolean progressChanged = false;
-    double estimatedTotalSec = 0.0;      // this is total simulation duration, not time remaining!
+    int estimatedTotalSec = 0;      // this is total simulation duration, not time remaining!
     double lastProgress = 0.0;
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
@@ -97,7 +97,7 @@ public class Watchdog {
             throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
         }
 
-        File etaFile = new File(simulationFolder, simulationName + ".eta");
+        etaFile = new File(simulationFolder, simulationName + ".eta");
 
         lg.info("Working folder : " + simulationFolder.getAbsolutePath());
         lg.info("Simulation name: " + simulationName);
@@ -109,10 +109,6 @@ public class Watchdog {
     public void doWork() {
 
         lg.info("Watchdog entering doWork()");
-
-        // TODO: we send just one of this to see what it does on the client side (eventually we'll use it for ETA maybe)
-        vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent("First WorkerAlive Event"), VCellMessaging.ThrowOnException.NO);
-
 
 //        long start = System.currentTimeMillis();
         long timeoutMillis = watchdogTimeout * 1000L;
@@ -156,22 +152,21 @@ public class Watchdog {
             }
         }
         // --------------------------------------------------------------------------------
-        // now we start a new loop where we check for progress.
+        // now we start a new loop where we check for progress and ETA.
         // at watchdog tick intervals, we check the log file for new lines.
         // If we don't see any new lines we just send a worker alive event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(...
         // if we see any new lines we calculate progress and send progress event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(.......), VCellMessaging.ThrowOnException.NO);
         // --------------------------------------------------------------------------------
-        lg.info("Watchdog entering progress monitoring loop for simulation: " + simulationName);
+        lg.info("Watchdog entering progress and ETA monitoring loop for simulation: " + simulationName);
         vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - watchdogStartTime), VCellMessaging.ThrowOnException.NO);
-
-
         long lastTick = System.currentTimeMillis();
         while (true) {
 
             long now = System.currentTimeMillis();
             long elapsedSinceLastTick = (now - lastTick) / 1000L;
+            // we get timestamps from the solvers, but this one is authoritative to ensure monotonicity
             long elapsedSinceStart = (now - watchdogStartTime) / 1000L;
 
             // Log that we are alive inside the second loop
@@ -185,9 +180,8 @@ public class Watchdog {
             progressChanged = updateProgress();
 
             if(etaChanged || progressChanged) {
-                // TODO: we will send both progress and ETA in the same event if either changed
-                // for now we send progress
-                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
+                // we send both progress and ETA in the same event if either changed
+                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTotalSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
             }
 
             try {                   // --------------------------- sleep for watchdogTick seconds
@@ -282,7 +276,8 @@ public class Watchdog {
         estimatedTotalSec = totalSec;   // this is what we send in the event
         lastEtaModSeen = lastMod;
 
-        lg.info("ETA changed: estimatedTotalSec=" + estimatedTotalSec +
+        // we only use total sec for now, we ignore the solver timestamp and confidence, but we log them for debugging
+        lg.info(" ETA changed: estimatedTotalSec=" + estimatedTotalSec +
                 ", confidence=" + confidence +
                 ", timestampSec=" + timestampSec);
 
