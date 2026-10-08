@@ -3,7 +3,7 @@ package org.vcell.messaging;
 public record WorkerEvent(
         WorkerStatus status,
         double progress_fraction,
-        int estimatedTotalTimeSeconds,  // 0 means unknown
+        int estimated_time,  // 0 means unknown
         double timepoint,
         String eventMessage
 ) {
@@ -13,8 +13,8 @@ public record WorkerEvent(
     public static WorkerEvent progressEvent(double progress_fraction, double timepoint) {
         return new WorkerEvent(WorkerStatus.JOB_PROGRESS, progress_fraction, 0, timepoint, "");
     }
-    public static WorkerEvent progressEvent(double progress_fraction, int estimatedTotalTimeSeconds, double timepoint) {
-        return new WorkerEvent(WorkerStatus.JOB_PROGRESS, progress_fraction, estimatedTotalTimeSeconds, timepoint, "");
+    public static WorkerEvent progressEvent(double progress_fraction, int estimated_time, double timepoint) {
+        return new WorkerEvent(WorkerStatus.JOB_PROGRESS, progress_fraction, estimated_time, timepoint, "");
     }
     public static WorkerEvent startingEvent(String eventMessage) {
         return new WorkerEvent(WorkerStatus.JOB_STARTING, 0.0, 0,0.0, eventMessage);

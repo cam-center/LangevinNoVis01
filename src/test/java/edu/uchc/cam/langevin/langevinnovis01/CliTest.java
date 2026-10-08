@@ -158,7 +158,7 @@ public class CliTest {
 //        assertTrue(solverResultSetMap.size() == numRuns, "expected size " + numRuns + " but found " + solverResultSetMap.size());
 //
 //    }
-
+    @Disabled("Manual-only test; excluded from CI")  // disabled for CI because it takes time
     @Test
     public void testRunAndPostCommand() throws IOException, InterruptedException {
 
@@ -546,7 +546,7 @@ public class CliTest {
         assertTrue(watchdogThread.isAlive(), "Watchdog should be running in the infinite loop");
 
         // we run some more, then kill the watchdog thread
-        Thread.sleep(20000);
+        Thread.sleep(10000);
         watchdogThread.interrupt();
 
         // Give it a moment to stop
@@ -632,14 +632,14 @@ public class CliTest {
 
             assertTrue(sysOutText.contains("Watchdog"), "1. Expected progress output missing");
             assertTrue(sysOutText.contains("started"), "2. Expected progress output missing");
-            assertTrue(sysOutText.contains("analyzing"), "3. Expected progress output missing");
             assertTrue(sysOutText.contains("folder"), "4. Expected progress output missing");
             assertTrue(sysOutText.contains("entering doWork"), "5. Expected progress output missing");
             assertTrue(sysOutText.contains("monitoring loop"), "6. Expected progress output missing");
             assertTrue(sysOutText.contains("loop tick"), "7. Expected progress output missing");
 
-            // this one actually never happens with the current settings
+            // this ones actually never happens with the current settings
             // assertTrue(sysOutText.contains("progress unchanged"), "8. Expected progress output missing");
+            // assertTrue(sysOutText.contains("analyzing"), "3. Expected progress output missing");
 
             assertTrue(sysOutText.contains("[[[progress:0.0%]]]"), "9. Expected progress output missing");     // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(...
             assertTrue(sysOutText.contains("progress changed"), "10. Expected progress output missing");

@@ -43,7 +43,7 @@ public class Watchdog {
     // they are computed / set in updateProgress() and updateEta()
     boolean etaChanged = false;
     boolean progressChanged = false;
-    int estimatedTotalSec = 0;      // this is total simulation duration, not time remaining!
+    int estimatedTimeSec = 0;      // this is total simulation duration, not time remaining!
     double lastProgress = 0.0;
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
@@ -181,7 +181,7 @@ public class Watchdog {
 
             if(etaChanged || progressChanged) {
                 // we send both progress and ETA in the same event if either changed
-                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTotalSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
+                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTimeSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
             }
 
             try {                   // --------------------------- sleep for watchdogTick seconds
@@ -273,11 +273,11 @@ public class Watchdog {
         }
 
         // Update internal state
-        estimatedTotalSec = totalSec;   // this is what we send in the event
+        estimatedTimeSec = totalSec;   // this is what we send in the event
         lastEtaModSeen = lastMod;
 
         // we only use total sec for now, we ignore the solver timestamp and confidence, but we log them for debugging
-        lg.info(" ETA changed: estimatedTotalSec=" + estimatedTotalSec +
+        lg.info(" ETA changed: estimatedTotalSec=" + estimatedTimeSec +
                 ", confidence=" + confidence +
                 ", timestampSec=" + timestampSec);
 

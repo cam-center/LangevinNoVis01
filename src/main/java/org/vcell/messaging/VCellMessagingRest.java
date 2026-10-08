@@ -30,6 +30,7 @@ public class VCellMessagingRest implements VCellMessaging {
     private final static String JOBINDEX_PROPERTY	= "JobIndex";
     private final static String WORKEREVENT_STATUS = "WorkerEvent_Status";
     private final static String WORKEREVENT_PROGRESS = "WorkerEvent_Progress";
+    private final static String WORKEREVENT_ESTIMATEDTIME = "WorkerEvent_EstimatedTime";
     private final static String WORKEREVENT_TIMEPOINT = "WorkerEvent_TimePoint";
     private final static String WORKEREVENT_STATUSMSG = "WorkerEvent_StatusMsg";
     private final static double WORKEREVENT_MESSAGE_MIN_TIME_SECONDS = 15.0;
@@ -149,6 +150,7 @@ public class VCellMessagingRest implements VCellMessaging {
         }
 
         ss_url.append(WORKEREVENT_PROGRESS).append("=").append(event.progress_fraction()).append("&");
+        ss_url.append(WORKEREVENT_ESTIMATEDTIME).append("=").append(event.estimated_time()).append("&");
         ss_url.append(WORKEREVENT_TIMEPOINT).append("=").append(event.timepoint());
 
         System.out.println("URL: " + ss_url.toString());
