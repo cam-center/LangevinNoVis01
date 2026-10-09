@@ -99,6 +99,7 @@ public class VCellMessagingRestTest {
                         "&WorkerEvent_Status=999" +
                         "&WorkerEvent_StatusMsg=Starting+Job" +
                         "&WorkerEvent_Progress=0.0" +
+                        "&WorkerEvent_EstimatedTime=0" +
                         "&WorkerEvent_TimePoint=0.0";
 
         vCellMessagingRest_good_creds.sendWorkerEvent(WorkerEvent.startingEvent("Starting Job"), VCellMessaging.ThrowOnException.YES);
@@ -126,6 +127,7 @@ public class VCellMessagingRestTest {
                         "&WorkerEvent_Status=999" +
                         "&WorkerEvent_StatusMsg=Starting+Job" +
                         "&WorkerEvent_Progress=0.0" +
+                        "&WorkerEvent_EstimatedTime=0" +
                         "&WorkerEvent_TimePoint=0.0";
 
         assertThrows(
@@ -151,6 +153,7 @@ public class VCellMessagingRestTest {
                         "&WorkerEvent_Status=1001" +
 //                        "&WorkerEvent_StatusMsg=Starting+Job" +
                         "&WorkerEvent_Progress=0.4" +
+                        "&WorkerEvent_EstimatedTime=0" +
                         "&WorkerEvent_TimePoint=2.0";
 
         vCellMessagingRest_good_creds.sendWorkerEvent(WorkerEvent.progressEvent(0.4, 2.0), VCellMessaging.ThrowOnException.YES);
