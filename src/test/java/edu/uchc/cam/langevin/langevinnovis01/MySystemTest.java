@@ -667,7 +667,7 @@ public class MySystemTest {
     @Test
     public void testETATrackerAndWatchdog() throws IOException {
         String sim_base_name = "SimID_123456789_0_";
-        int runCounter = 1;
+        int runCounter = 1; // we run only simulation #1 because that's the one creating the ETA file
 
         // Load the real file
         String inputFileContents;
@@ -680,7 +680,7 @@ public class MySystemTest {
         Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
         Path logFile = tempDirectory.resolve(sim_base_name + "1.log");
         Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
-        Path etaFile = tempDirectory.resolve(sim_base_name + ".eta");   // eta file is unique, no _1
+        Path etaFile = tempDirectory.resolve(sim_base_name + ".eta");   // eta file is unique, no index
 
         // Make simulation run long enough to hit a few ETA points
         inputFileContents = setInitialValue(inputFileContents, "MT0", 40);
@@ -697,17 +697,18 @@ public class MySystemTest {
             String[] args = {
                     "watchdog",
                     modelFile.toString(),
-                    "3",                        // numRuns = 1 for this test
-                    "--watchdog-tick", "2",     // check every 2 seconds
-                    "--watchdog-timeout", "60", // generous timeout
+                    "3",                        // numRuns = *** for this test, although we really run sim #1 only
+                    "--watchdog-tick", "2",     // check every *** seconds
+                    "--watchdog-timeout", "60", // generous timeout for waiting after a fresh log file (in seconds)
                     "--vc-print-status"         // uses VCellMessagingLocal
             };
             CommandLine cmd = new CommandLine(new CliMain());
             Thread watchdogThread = new Thread(() -> cmd.execute(args));    // Run watchdog in a separate thread
             watchdogThread.start();
 
-
-            // Run the simulation in its own thread
+            // We only want to run one simulation, which is index 1 (runCounter == 1), because
+            // that is the only one that creates the ETA file
+            // We run simulation #1 in its own thread
             g = new Global(modelFile.toFile(), logFile.toFile());
             assertNotNull(g);
             sys = new MySystem(g, runCounter, true, vcellMessaging);
