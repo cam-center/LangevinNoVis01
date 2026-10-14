@@ -27,7 +27,16 @@ public class Watchdog {
     // since ETA is the duration of one simulation, actually the whole run will be (eta * num batches)
     // ex: 7 jobs in total, 3 concurrent jobs, we have 3 batches: batch 1: jobs 0,1,2; batch 2: jobs 3,4,5; batch 3: job 6
     private final int maxConcurrentJobs;
-    private final int watchdogTick;
+
+    // base tick interval in seconds, received as command line argument
+    private final int watchdogBaseTickSec;
+
+    // current tick interval, which is adjusted based on the ETA (if available).
+    // will default to base tick interval if ETA is not available
+    private int watchdogCurrentTickSec = 20;    // feels like a good compromise for the stale loop when there's no ETA yet
+
+    // time we wait for the simulation #1 log file to be created or updated before we consider that something went
+    // wrong and exit the watchdog entirely
     private final int watchdogTimeout;
 
     // used internally in updateProgress()
@@ -60,7 +69,7 @@ public class Watchdog {
         this.vcellMessaging = vcellMessaging;
         this.epochStartTimeMS = watchdogCutoff * 1000L;  // convert seconds to milliseconds
         this.maxConcurrentJobs = maxConcurrentJobs;
-        this.watchdogTick = watchdogTick;
+        this.watchdogBaseTickSec = watchdogTick;
         this.watchdogTimeout = watchdogTimeout;
     }
 
@@ -89,7 +98,7 @@ public class Watchdog {
         // race condition with start time of the simulations (there is no guarantee that the watchdog starts first)
         SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
         String dateTime = sdf.format(new Date(System.currentTimeMillis()));
-        lg.info("Watchdog started at " + dateTime + " (watchdogTick=" + watchdogTick + " seconds, watchdogTimeout=" + watchdogTimeout + " seconds)");
+        lg.info("Watchdog started at " + dateTime + " (watchdogTick=" + watchdogBaseTickSec + " seconds, watchdogTimeout=" + watchdogTimeout + " seconds)");
         lg.info("Watchdog: Single source of truth for start time of current slurm job is epochStartTimeMS = " + epochStartTimeMS + " ms");
         String epochStartDateTime = sdf.format(new Date(epochStartTimeMS));
         lg.info("Watchdog: Epoch start time (formatted): " + epochStartDateTime);
@@ -178,7 +187,7 @@ public class Watchdog {
 
             // Sleep once per tick
             try {
-                Thread.sleep(watchdogTick * 1000L);
+                Thread.sleep(watchdogCurrentTickSec * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Watchdog interrupted: ", e);
@@ -195,6 +204,8 @@ public class Watchdog {
         lg.info("Watchdog entering progress and ETA monitoring loop for simulation: " + simulationName);
         vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - epochStartTimeMS), VCellMessaging.ThrowOnException.NO);
         long lastTick = System.currentTimeMillis();
+        boolean watchdogCurrentTickAdjusted = false;
+        watchdogCurrentTickSec = chooseAdaptiveTick(0); // shortest initial tick interval, will be adjusted based on ETA if available
         while (true) {
 
             long now = System.currentTimeMillis();
@@ -212,13 +223,29 @@ public class Watchdog {
             etaChanged = updateEta();
             progressChanged = updateProgress();
 
+            // adaptive tick interval adjustment based on ETA, if available - or reset to base tick if not
+            if(etaChanged) {
+                // if ETA changed, we adjust the watchdog tick interval to be suitable for the estimated total simulation time
+                // we don't do this too often, the eta hardcoded schedule has few entries, it's also very unlikely to bucket jump
+                watchdogCurrentTickSec = chooseAdaptiveTick(estimatedTimeSec);
+                watchdogCurrentTickAdjusted = true;
+                lg.info("Watchdog: ETA changed, adjusting tick interval to " + watchdogCurrentTickSec + " seconds");
+            }
+            if(elapsedSinceStart >= timeoutMillis && watchdogCurrentTickAdjusted == false) {
+                // no eta was ever computed in quite a long time, we assume something went wrong and
+                // we reset the watchdog tick interval to the base tick interval
+                lg.info("Watchdog: Timeout waiting for an ETA update, defaulting to base tick interval of " + watchdogBaseTickSec + " seconds");
+                watchdogCurrentTickSec = watchdogBaseTickSec;   // reset to base tick interval
+                watchdogCurrentTickAdjusted = true;   // counts as an adjustment; we only need to do this once
+            }
+
             if(etaChanged || progressChanged) {
                 // we send both progress and ETA in the same event if either changed
                 vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTimeSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
             }
 
             try {                   // --------------------------- sleep for watchdogTick seconds
-                Thread.sleep(watchdogTick * 1000L);
+                Thread.sleep(watchdogCurrentTickSec * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 lg.warn("Watchdog interrupted during progress loop");
@@ -226,6 +253,22 @@ public class Watchdog {
             }
         }
     }
+
+    // we choose a watchdog tick suitable for the estimated total simulation time,
+    // so we don't sample too often the filesystem for long simulations where each 1% progress may take hours and
+    // nothing happens in between
+    private int chooseAdaptiveTick(int totalSec) {
+        if (totalSec < 600)       return 10;    // < 10 minutes, tick every 10 seconds
+        if (totalSec < 1800)      return 15;    // < 30 minutes, tick every 15 seconds
+        if (totalSec < 3600)      return 20;    // < 1 hour, tick every 20 seconds
+        if (totalSec < 7200)      return 30;    // < 2 hours, tick every 30 seconds
+        if (totalSec < 14400)     return 60;    // < 4 hours, tick every 60 seconds
+        // anything longer, we tick every 2 minutes, which is a nice compromise between low spamming and responsiveness
+        // for very long sims we won't spam the messaging system too often anyway,
+        // since we only fire events when progress changes
+        return 120;
+    }
+
 
     // -----------------------------------------------------------------------------------
     // this is where we read the ETA file and update the lastEta value
