@@ -27,6 +27,7 @@ public class Watchdog {
     // since ETA is the duration of one simulation, actually the whole run will be (eta * num batches)
     // ex: 7 jobs in total, 3 concurrent jobs, we have 3 batches: batch 1: jobs 0,1,2; batch 2: jobs 3,4,5; batch 3: job 6
     private final int maxConcurrentJobs;
+    private int numBatches;     // see above. Computed once in setup
 
     // base tick interval in seconds, received as command line argument
     private final int watchdogBaseTickSec;
@@ -58,7 +59,10 @@ public class Watchdog {
     // they are computed / set in updateProgress() and updateEta()
     boolean etaChanged = false;
     boolean progressChanged = false;
-    int estimatedTimeSec = 0;      // this is total simulation duration, not time remaining!
+    // this is the total duration of the simulation, duration of run #1 multiplied by the number of batches,
+    // which is (numRuns / maxConcurrentJobs) rounded up
+    // this is not remaining time!
+    int estimatedTimeSec = 0;
     double lastProgress = 0.0;
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
@@ -102,6 +106,9 @@ public class Watchdog {
         lg.info("Watchdog: Single source of truth for start time of current slurm job is epochStartTimeMS = " + epochStartTimeMS + " ms");
         String epochStartDateTime = sdf.format(new Date(epochStartTimeMS));
         lg.info("Watchdog: Epoch start time (formatted): " + epochStartDateTime);
+
+        numBatches = (numRuns + maxConcurrentJobs - 1) / maxConcurrentJobs;   // round up division (integer ceiling)
+        lg.info("Watchdog: " + numRuns + " runs, " + maxConcurrentJobs + " concurrent -> " + numBatches + " batch(es)");
 
         latestPercent = new int[numRuns];       // initialize progress counters
         lastModifiedSeen = new long[numRuns];
@@ -227,6 +234,8 @@ public class Watchdog {
             if(etaChanged) {
                 // if ETA changed, we adjust the watchdog tick interval to be suitable for the estimated total simulation time
                 // we don't do this too often, the eta hardcoded schedule has few entries, it's also very unlikely to bucket jump
+                // note that estimatedTimeSec is the duration of the whole simulation (run #1 duration multiplied by
+                // the number of batches)
                 watchdogCurrentTickSec = chooseAdaptiveTick(estimatedTimeSec);
                 watchdogCurrentTickAdjusted = true;
                 lg.info("Watchdog: ETA changed, adjusting tick interval to " + watchdogCurrentTickSec + " seconds");
@@ -349,11 +358,12 @@ public class Watchdog {
         }
 
         // Update internal state
-        estimatedTimeSec = totalSec;   // this is what we send in the event
+        // totalSec is the duration of a single run (run #1); the whole job runs numBatches batches sequentially
+        long batchTotalSec = (long) totalSec * numBatches;
+        estimatedTimeSec = (int) Math.min(batchTotalSec, Integer.MAX_VALUE);   // this is what we send in the event
         lastEtaModSeen = lastMod;
-
-        // we only use total sec for now, we ignore the solver timestamp and confidence, but we log them for debugging
-        lg.info(" ETA changed: estimatedTotalSec=" + estimatedTimeSec +
+        lg.info(" ETA changed: singleRunSec=" + totalSec + ", numBatches=" + numBatches +
+                ", estimatedTotalSec=" + estimatedTimeSec +
                 ", confidence=" + confidence +
                 ", timestampSec=" + timestampSec);
 
