@@ -15,7 +15,7 @@ import java.util.Date;
 
 public class Watchdog {
 
-    public static final Logger lg = LogManager.getLogger(ConsolidationPostprocessor.class);
+    public static final Logger lg = LogManager.getLogger(Watchdog.class);
 
     private Global g;
     private final VCellMessaging vcellMessaging;

@@ -1215,9 +1215,6 @@ public class MySystem {
             lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
 
-        // TODO: Write last ETA snapshot and real duration to file that will be used by watchdog
-        //  use etaTracker.getLastSnapshot() and etaTracker.getTotalDuration()
-
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();
         this.writeSiteIDs();
