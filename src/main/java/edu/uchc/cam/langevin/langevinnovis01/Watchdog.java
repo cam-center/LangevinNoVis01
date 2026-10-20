@@ -34,7 +34,7 @@ public class Watchdog {
 
     // current tick interval, which is adjusted based on the ETA (if available).
     // will default to base tick interval if ETA is not available
-    private int watchdogCurrentTickSec = 20;    // feels like a good compromise for the stale loop when there's no ETA yet
+    private int watchdogCurrentTickSec = 10;    // feels like a good compromise for the stale loop when there's no ETA yet
 
     // time we wait for the simulation #1 log file to be created or updated before we consider that something went
     // wrong and exit the watchdog entirely
@@ -116,7 +116,9 @@ public class Watchdog {
 
         latestPercent = new int[numRuns];       // initialize progress counters
         lastModifiedSeen = new long[numRuns];
-        lastBatchPercent = 0;
+        // -1 forces the first tick of the progress loop to report as "changed", so the first event goes out
+        // immediately (with the ETA if we already have one) instead of being throttled behind a separate 0.0 event
+        lastBatchPercent = -1;
 
         simulationFolder = g.getDefaultFolder();
 
@@ -213,10 +215,11 @@ public class Watchdog {
         // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(.......), VCellMessaging.ThrowOnException.NO);
         // --------------------------------------------------------------------------------
         lg.info("Watchdog entering progress and ETA monitoring loop for simulation: " + simulationName);
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - epochStartTimeMS), VCellMessaging.ThrowOnException.NO);
+//        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - epochStartTimeMS), VCellMessaging.ThrowOnException.NO);
         long lastTick = System.currentTimeMillis();
         boolean watchdogCurrentTickAdjusted = false;
         watchdogCurrentTickSec = chooseAdaptiveTick(0); // shortest initial tick interval, will be adjusted based on ETA if available
+        lg.info("Watchdog: initial tick interval " + watchdogCurrentTickSec + " seconds");
         while (true) {
 
             long now = System.currentTimeMillis();
@@ -231,18 +234,21 @@ public class Watchdog {
             progressChanged = false;
             lastTick = now;     // reset tick timer
 
-            etaChanged = updateEta();
-            progressChanged = updateProgress();
+            etaChanged = updateEta();               // sets estimatedTimeSec
+            progressChanged = updateProgress();     // sets lastProgress and allRunsFinished
 
             // adaptive tick interval adjustment based on ETA, if available - or reset to base tick if not
             if(etaChanged) {
-                // if ETA changed, we adjust the watchdog tick interval to be suitable for the estimated total simulation time
-                // we don't do this too often, the eta hardcoded schedule has few entries, it's also very unlikely to bucket jump
+                // if ETA changed, we may need a different tick interval suitable for the estimated total simulation time
+                // most of the time the new ETA falls in the same bucket and the tick stays the same
                 // note that estimatedTimeSec is the duration of the whole simulation (run #1 duration multiplied by
                 // the number of batches)
-                watchdogCurrentTickSec = chooseAdaptiveTick(estimatedTimeSec);
-                watchdogCurrentTickAdjusted = true;
-                lg.info("Watchdog: ETA changed, adjusting tick interval to " + watchdogCurrentTickSec + " seconds");
+                int newTickSec = chooseAdaptiveTick(estimatedTimeSec);
+                if(newTickSec != watchdogCurrentTickSec) {
+                    lg.info("Watchdog: adjusting tick interval from " + watchdogCurrentTickSec + " to " + newTickSec + " seconds");
+                    watchdogCurrentTickSec = newTickSec;
+                }
+                watchdogCurrentTickAdjusted = true;     // an ETA arrived, so we no longer need the no-ETA timeout fallback
             }
             if(elapsedSinceStart >= timeoutMillis && watchdogCurrentTickAdjusted == false) {
                 // no eta was ever computed in quite a long time, we assume something went wrong and
@@ -370,13 +376,16 @@ public class Watchdog {
         // Update internal state
         // totalSec is the duration of a single run (run #1); the whole job runs numBatches batches sequentially
         long batchTotalSec = (long) totalSec * numBatches;
-        estimatedTimeSec = (int) Math.min(batchTotalSec, Integer.MAX_VALUE);   // this is what we send in the event
-        lastEtaModSeen = lastMod;
-        lg.info(" ETA changed: singleRunSec=" + totalSec + ", numBatches=" + numBatches +
+        int newEstimatedTimeSec = (int) Math.min(batchTotalSec, Integer.MAX_VALUE);
+        lastEtaModSeen = lastMod;       // this file version is processed, whether or not the estimate changed
+        if (newEstimatedTimeSec == estimatedTimeSec) {
+            return false;   // new ETA snapshot, but the whole-second estimate is the same: nothing to report
+        }
+        estimatedTimeSec = newEstimatedTimeSec;     // this is what we send in the event
+        lg.info("   watchdog.updateETA(): ETA changed: singleRunSec=" + totalSec + ", numBatches=" + numBatches +
                 ", estimatedTotalSec=" + estimatedTimeSec +
                 ", confidence=" + confidence +
                 ", timestampSec=" + timestampSec);
-
         return true;    // ETA changed
     }
 
@@ -430,9 +439,9 @@ public class Watchdog {
 
         // Compare with previous tick
         if (batchPercent != lastBatchPercent) {
-            lg.info(String.format("Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
+            lg.info(String.format("   watchdog.updateProgress(): Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
             lastBatchPercent = batchPercent;        // this is used internally, here in updateProgress()
-            lastProgress = lastBatchPercent/100;    // this is what we send in the event
+            lastProgress = lastBatchPercent/100;    // this is what we send in the event and what the user sees
             return true;  // progress changed
 
         } else {

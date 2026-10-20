@@ -20,6 +20,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -658,7 +659,8 @@ public class MySystemTest {
     }
 
     // ------------------------------------------------------------------------------------
-    // do not run on github actions, it's somewhat long
+    // do not run on github actions, it's somewhat long and the assert don't really capture what the watchdog is doing
+    // We can see whether it's working or not only through visual inspection of the output
     @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     /*
      * Testing the ETA tracker and watchdog functionality, ensuring that the ETA is computed correctly and
@@ -693,17 +695,22 @@ public class MySystemTest {
         MySystem sys = null;
 
         try {
+            long cutoffSec = System.currentTimeMillis() / 1000L;     // slurm epoch equivalent: logs older than this are stale
             // Start the watchdog in a separate thread, which will monitor the ETA file and ensure that the simulation is progressing
             String[] args = {
                     "watchdog",
                     modelFile.toString(),
                     "3",                        // numRuns = *** for this test, although we really run sim #1 only
+                    "--watchdog-cutoff", Long.toString(cutoffSec),
+                    "--max-concurrent-jobs", "3",
                     "--watchdog-tick", "2",     // check every *** seconds
                     "--watchdog-timeout", "60", // generous timeout for waiting after a fresh log file (in seconds)
                     "--vc-print-status"         // uses VCellMessagingLocal
             };
+
+            AtomicInteger watchdogExitCode = new AtomicInteger(-1);
             CommandLine cmd = new CommandLine(new CliMain());
-            Thread watchdogThread = new Thread(() -> cmd.execute(args));    // Run watchdog in a separate thread
+            Thread watchdogThread = new Thread(() -> watchdogExitCode.set(cmd.execute(args)));    // Run watchdog in a separate thread
             watchdogThread.start();
 
             // We only want to run one simulation, which is index 1 (runCounter == 1), because
@@ -730,6 +737,11 @@ public class MySystemTest {
 
             // --- Wait for simulation to finish ---
             simulationThread.join();
+
+            // the watchdog must still be alive here: runs 0 and 2 never write a log, so progress can't reach 100%
+            // and the watchdog can't exit gracefully; if it's dead, it failed (bad arguments, timeout, crash)
+            Assertions.assertTrue(watchdogThread.isAlive(),
+                    "Watchdog should be running, but it exited with code " + watchdogExitCode.get());
 
             // --- Stop watchdog (it won't stop by itself) ---
             watchdogThread.interrupt();
