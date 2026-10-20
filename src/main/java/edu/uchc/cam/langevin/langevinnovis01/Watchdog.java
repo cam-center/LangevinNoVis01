@@ -46,6 +46,10 @@ public class Watchdog {
     private long[] lastModifiedSeen;    // last modified timestamp we last processed
     private double lastBatchPercent;    // percent at previous tick
 
+    // true when every run reported 100%, computed in the integer domain to avoid double precision traps
+    // (0.999999997 instead of 1.0) - the watchdog exits gracefully when this becomes true
+    private boolean allRunsFinished = false;
+
     // used internally in updateEta()
     private long lastEtaModSeen = 0L;
 
@@ -253,6 +257,12 @@ public class Watchdog {
                 vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTimeSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
             }
 
+            // the tick where the last run reaches 100% is also a progress change, so the 1.0 event was just sent above
+            if(allRunsFinished) {
+                lg.info("Watchdog: all " + numRuns + " runs reached 100%, exiting gracefully");
+                return;     // exit the watchdog gracefully
+            }
+
             try {                   // --------------------------- sleep for watchdogTick seconds
                 Thread.sleep(watchdogCurrentTickSec * 1000L);
             } catch (InterruptedException e) {
@@ -414,6 +424,7 @@ public class Watchdog {
             }
             sum += latestPercent[i];
         }
+        allRunsFinished = (sum == 100 * numRuns);   // integer check, see comment at declaration
 
         double batchPercent = (double)sum / (double)numRuns;
 
