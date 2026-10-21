@@ -17,6 +17,10 @@ public class Watchdog {
 
     public static final Logger lg = LogManager.getLogger(Watchdog.class);
 
+    // message of the exception thrown when the log file of run #1 never shows up (or stays stale) within the timeout
+    // tests use it to verify that the watchdog failed for this exact reason
+    public static final String TimeoutFreshLogNotFound = "Watchdog timeout: fresh log file not found";
+
     private Global g;
     private final VCellMessaging vcellMessaging;
     private int numRuns;        // number of runs
@@ -195,7 +199,7 @@ public class Watchdog {
 
             if (elapsed >= timeoutMillis) {
                 lg.error("Watchdog: Timeout waiting for fresh log file: " + log1.getAbsolutePath());
-                throw new RuntimeException("Watchdog timeout: fresh log file not found");
+                throw new RuntimeException(TimeoutFreshLogNotFound);
             }
 
             // Sleep once per tick
@@ -228,7 +232,7 @@ public class Watchdog {
             long elapsedSinceStart = now - epochStartTimeMS;
 
             // Log that we are alive inside the second loop
-            lg.info("Watchdog progress loop tick — elapsed " + (elapsedSinceLastTick / 1000) + " seconds since last tick");
+            lg.info("Watchdog progress loop tick - elapsed " + (elapsedSinceLastTick / 1000) + " seconds since last tick");
 
             etaChanged = false;
             progressChanged = false;

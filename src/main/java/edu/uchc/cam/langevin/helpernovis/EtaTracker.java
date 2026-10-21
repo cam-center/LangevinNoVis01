@@ -114,7 +114,7 @@ public class EtaTracker {
         etaHardcodedScheduleIndex = 0;
 
         // ------------------------------------------------------------
-        // MODE SELECTION — STRICT AND EXPLICIT
+        // MODE SELECTION - STRICT AND EXPLICIT
         // ------------------------------------------------------------
 
         // MODE 4: ETA DISABLED
@@ -328,11 +328,11 @@ public class EtaTracker {
 
         try (FileWriter fw = new FileWriter(etaFile, true)) {   // append mode
 
-            // Convert nanoseconds → integer seconds
+            // Convert nanoseconds -> integer seconds
             int totalSec     = (int)(lastEtaTotalNs / 1_000_000_000L);
             int timestampSec = (int)(lastEtaTimeMs / 1000L);
 
-            // Confidence: simple integer 0–1000 (you can refine later)
+            // Confidence: simple integer 0-1000 (you can refine later)
             int confidence = (int)(Math.min(1.0, Math.max(0.0, lastEtaProgress)) * 1000);
 
             // we don't really use the confidence right now, but we could do some sanity checks in the watchdog, look for drift, etc
