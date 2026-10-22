@@ -30,6 +30,7 @@ public class VCellMessagingRest implements VCellMessaging {
     private final static String JOBINDEX_PROPERTY	= "JobIndex";
     private final static String WORKEREVENT_STATUS = "WorkerEvent_Status";
     private final static String WORKEREVENT_PROGRESS = "WorkerEvent_Progress";
+    private final static String WORKEREVENT_ESTIMATEDTIME = "WorkerEvent_EstimatedTime";
     private final static String WORKEREVENT_TIMEPOINT = "WorkerEvent_TimePoint";
     private final static String WORKEREVENT_STATUSMSG = "WorkerEvent_StatusMsg";
     private final static double WORKEREVENT_MESSAGE_MIN_TIME_SECONDS = 15.0;
@@ -149,9 +150,11 @@ public class VCellMessagingRest implements VCellMessaging {
         }
 
         ss_url.append(WORKEREVENT_PROGRESS).append("=").append(event.progress_fraction()).append("&");
+        ss_url.append(WORKEREVENT_ESTIMATEDTIME).append("=").append(event.estimated_time()).append("&");
         ss_url.append(WORKEREVENT_TIMEPOINT).append("=").append(event.timepoint());
 
-        System.out.println("URL: " + ss_url.toString());
+        // don't print the broker password, the URL ends up in the slurm logs
+        System.out.println("URL: " + ss_url.toString().replace(":" + m_broker_password + "@", ":****@"));
         URI uri = URI.create(ss_url.toString());
         HttpClient client = HttpClient.newHttpClient();
         String credentials = Base64.getEncoder().encodeToString((m_broker_username+":"+m_broker_password).getBytes(UTF_8));
@@ -163,7 +166,7 @@ public class VCellMessagingRest implements VCellMessaging {
         try {
             // send the request
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            System.out.println(response.statusCode());
+//            System.out.println(response.statusCode());
             if (response.statusCode() != 200) {
                 String errorMsg = "Failed to send WorkerEvent via REST to ActiveMQ server, HTTP response code: " + response.statusCode() + ", body: " + response.body();
                 if (throwOnException == ThrowOnException.YES) {
@@ -173,9 +176,15 @@ public class VCellMessagingRest implements VCellMessaging {
                 }
             }
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                // catching it clears the interrupt flag; restore it, otherwise the caller (ex: the watchdog loop)
+                // never sees the interrupt and keeps running
+                Thread.currentThread().interrupt();
+            }
             e.printStackTrace();
             if (throwOnException == ThrowOnException.NO) {
-                System.err.println("Exception sending WorkerEvent via REST to ActiveMQ server: " + e.getMessage());
+                // e.getMessage() is often null, e.toString() also shows the exception class (ex: java.net.ConnectException)
+                System.err.println("Exception sending WorkerEvent via REST to ActiveMQ server: " + e);
                 return;
             }
             throw new RuntimeException(e.getMessage(), e);

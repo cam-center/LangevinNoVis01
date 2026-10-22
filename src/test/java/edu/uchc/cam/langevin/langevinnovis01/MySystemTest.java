@@ -1,7 +1,9 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.cli.CliMain;
 import edu.uchc.cam.langevin.helpernovis.EtaTracker;
 import edu.uchc.cam.langevin.helpernovis.IOHelp;
+import edu.uchc.cam.langevin.helpernovis.SolverConstants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.VCellMessagingLocal;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,6 +20,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -449,7 +453,9 @@ public class MySystemTest {
     // do not run on github actions, it's somewhat long
     @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
     /*
-     * We have disabled the default schedule, and we want to make sure that the hardcoded schedule is used instead
+     * We have disabled the default schedule, and we want to make sure that the hardcoded schedule is used
+     * We also test that the .eta file is being created and contains the expected fields,
+     * and that the ETA is being computed at least once
      */
     @Test
     public void estimateDurationHardcodedScheduleOnly() throws IOException {
@@ -467,10 +473,11 @@ public class MySystemTest {
         Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
         Path logFile = tempDirectory.resolve(sim_base_name + "_1.log");
         Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+        Path etaFile = tempDirectory.resolve(sim_base_name + ".eta");   // eta file is unique, no _1
 
-        // Make simulation run long enough to hit 1s, 2s, 3s ETA points
-        inputFileContents = setInitialValue(inputFileContents, "MT0", 40);
-        inputFileContents = setInitialValue(inputFileContents, "MT1", 40);
+        // Make simulation run long enough to hit a few ETA points
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 80);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 80);
 
         Files.writeString(modelFile, inputFileContents);
 
@@ -488,15 +495,27 @@ public class MySystemTest {
             EtaTracker eta = sys.getEtaTracker();
 
             // *** Hardcoded schedule only ***
-            eta.setEtaHardcodedScheduleSeconds(new int[] {1, 2, 3, 6, 12, 20});     // ETA at 1s, 2s, 3s...
+            eta.setEtaHardcodedScheduleSeconds(new int[] {2, 4, 6, 8, 12, 16, 20});     // ETA at xs, ys, zs...
             eta.setUseDefaultSchedule(false);   // disable fallback
             eta.setEtaLoggingCutoffMs(10_000);  // IRRELEVANT! fallback is disabled, we stop after the hardcoded schedule
 
             // Run simulation
             sys.runSystem();
 
-            // Simulation must produce output
+            // Simulation must produce output IDA file
             Assertions.assertTrue(Files.exists(idaFile));
+
+            // Simulation 1 must produce ETA file, and it must contain the expected fields
+            Assertions.assertTrue(Files.exists(etaFile), "ETA file should have been created by the ETA tracker");
+            Assertions.assertTrue(Files.size(etaFile) > 0, "ETA file should not be empty");
+
+            String etaContents = Files.readString(etaFile);
+            Assertions.assertTrue(etaContents.contains(SolverConstants.EtaEstimatedTotalSec),
+                    "ETA file must contain field: " + SolverConstants.EtaEstimatedTotalSec);
+            Assertions.assertTrue(etaContents.contains(SolverConstants.EtaConfidence),
+                    "ETA file must contain field: " + SolverConstants.EtaConfidence);
+            Assertions.assertTrue(etaContents.contains(SolverConstants.EtaTimestampSec),
+                    "ETA file must contain field: " + SolverConstants.EtaTimestampSec);
 
             // *** Verify ETA fired at least once ***
             long lastEta = eta.getLastEtaTimeMs();
@@ -638,6 +657,109 @@ public class MySystemTest {
             deleteDirectory(tempDirectory.toFile());
         }
     }
+
+    // ------------------------------------------------------------------------------------
+    // do not run on github actions, it's somewhat long and the assert don't really capture what the watchdog is doing
+    // We can see whether it's working or not only through visual inspection of the output
+    @DisabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true")
+    /*
+     * Testing the ETA tracker and watchdog functionality, ensuring that the ETA is computed correctly and
+     * that the watchdog mechanism reads it properly
+     */
+    @Test
+    public void testETATrackerAndWatchdog() throws IOException {
+        String sim_base_name = "SimID_123456789_0_";
+        int runCounter = 1; // we run only simulation #1 because that's the one creating the ETA file
+
+        // Load the real file
+        String inputFileContents;
+        try (InputStream is = getClass().getResourceAsStream("/AllReactions.ssld")) {
+            assertNotNull(is, "Resource AllReactions.ssld not found");
+            inputFileContents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        Path tempDirectory = Files.createTempDirectory("test_eta_and_watchdog");
+        Path modelFile = tempDirectory.resolve(sim_base_name + ".langevinInput");
+        Path logFile = tempDirectory.resolve(sim_base_name + "1.log");
+        Path idaFile = tempDirectory.resolve(sim_base_name + "_1.ida");
+        Path etaFile = tempDirectory.resolve(sim_base_name + ".eta");   // eta file is unique, no index
+
+        // Make simulation run long enough to hit a few ETA points
+        inputFileContents = setInitialValue(inputFileContents, "MT0", 40);
+        inputFileContents = setInitialValue(inputFileContents, "MT1", 40);
+
+        Files.writeString(modelFile, inputFileContents);
+
+        VCellMessaging vcellMessaging = new VCellMessagingLocal();
+        Global g = null;
+        MySystem sys = null;
+
+        try {
+            long cutoffSec = System.currentTimeMillis() / 1000L;     // slurm epoch equivalent: logs older than this are stale
+            // Start the watchdog in a separate thread, which will monitor the ETA file and ensure that the simulation is progressing
+            String[] args = {
+                    "watchdog",
+                    modelFile.toString(),
+                    "3",                        // numRuns = *** for this test, although we really run sim #1 only
+                    "--watchdog-cutoff", Long.toString(cutoffSec),
+                    "--max-concurrent-jobs", "3",
+                    "--watchdog-tick", "2",     // check every *** seconds
+                    "--watchdog-timeout", "60", // generous timeout for waiting after a fresh log file (in seconds)
+                    "--vc-print-status"         // uses VCellMessagingLocal
+            };
+
+            AtomicInteger watchdogExitCode = new AtomicInteger(-1);
+            CommandLine cmd = new CommandLine(new CliMain());
+            Thread watchdogThread = new Thread(() -> watchdogExitCode.set(cmd.execute(args)));    // Run watchdog in a separate thread
+            watchdogThread.start();
+
+            // We only want to run one simulation, which is index 1 (runCounter == 1), because
+            // that is the only one that creates the ETA file
+            // We run simulation #1 in its own thread
+            g = new Global(modelFile.toFile(), logFile.toFile());
+            assertNotNull(g);
+            sys = new MySystem(g, runCounter, true, vcellMessaging);
+            assertNotNull(sys);
+
+            EtaTracker eta = sys.getEtaTracker();
+            eta.setEtaHardcodedScheduleSeconds(new int[] {3, 6, 9, 12, 15, 18, 21});     // ETA at xs, ys, zs...
+            eta.setUseDefaultSchedule(false);   // disable fallback
+
+            MySystem finalSys = sys;
+            Thread simulationThread = new Thread(() -> {
+                try {
+                    finalSys.runSystem();
+                } catch (Exception ex) {
+                    throw new RuntimeException("Simulation thread failed", ex);
+                }
+            });
+            simulationThread.start();
+
+            // --- Wait for simulation to finish ---
+            simulationThread.join();
+
+            // the watchdog must still be alive here: runs 0 and 2 never write a log, so progress can't reach 100%
+            // and the watchdog can't exit gracefully; if it's dead, it failed (bad arguments, timeout, crash)
+            Assertions.assertTrue(watchdogThread.isAlive(),
+                    "Watchdog should be running, but it exited with code " + watchdogExitCode.get());
+
+            // --- Stop watchdog (it won't stop by itself) ---
+            watchdogThread.interrupt();
+            watchdogThread.join(2000);   // give it 2 seconds to exit
+
+
+            Assertions.assertTrue(Files.exists(idaFile));   // Simulation must produce IDA and ETA files
+            Assertions.assertTrue(Files.exists(etaFile), "ETA file should have been created by the ETA tracker");
+
+
+            System.out.println("Watchdog and ETA test completed.");
+        } catch (Exception e) {
+            Assertions.fail("Unexpected exception during test: " + e.getMessage());
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
 
     // ----------------------------------------------------------------------------------
 

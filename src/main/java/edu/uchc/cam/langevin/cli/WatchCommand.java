@@ -43,6 +43,22 @@ public class WatchCommand implements Callable<Integer> {
     private Integer taskId_NOT_USED = null;
 
     @CommandLine.Option(
+            names = {"--watchdog-cutoff"},
+            required = true,
+            type = Long.class,
+            description = "Epoch time (seconds) before which log files are considered stale"
+    )
+    private Long watchdogCutoff = null;
+
+    @CommandLine.Option(
+            names = {"--max-concurrent-jobs"},
+            required = true,
+            type = Integer.class,
+            description = "Maximum number of concurrent simulation jobs"
+    )
+    private Integer maxConcurrentJobs = null;
+
+    @CommandLine.Option(
             names = {"--watchdog-tick"},
             required = true,
             type = Integer.class,
@@ -72,6 +88,15 @@ public class WatchCommand implements Callable<Integer> {
         }
         if(numRuns == null || numRuns <= 1) {   // batch run requires at least 2 simulations (excluding the watchdog)
             System.err.println("Number of simulations must be a positive number > 1. Found: " + numRuns);
+            return 1;
+        }
+        if (watchdogCutoff == null || watchdogCutoff <= 0) {
+            System.err.println("Watchdog cutoff must be a positive epoch time. Found: " + watchdogCutoff);
+            return 1;
+        }
+
+        if (maxConcurrentJobs == null || maxConcurrentJobs <= 0) {
+            System.err.println("Max concurrent jobs must be a positive number. Found: " + maxConcurrentJobs);
             return 1;
         }
         if (watchdogTick == null || watchdogTick <= 0) {
@@ -104,11 +129,11 @@ public class WatchCommand implements Callable<Integer> {
         if (logFile == null) {
             g = new Global(modelFile);
             wd = new Watchdog(g, numRuns, false, vcellMessaging,
-                    watchdogTick, watchdogTimeout);
+                    watchdogCutoff, maxConcurrentJobs, watchdogTick, watchdogTimeout);
         } else {
             g = new Global(modelFile, logFile);
             wd = new Watchdog(g, numRuns, true, vcellMessaging,
-                    watchdogTick, watchdogTimeout);
+                    watchdogCutoff, maxConcurrentJobs, watchdogTick, watchdogTimeout);
         }
 
         wd.setup();

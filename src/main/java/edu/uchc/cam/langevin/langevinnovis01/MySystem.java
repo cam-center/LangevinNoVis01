@@ -1083,7 +1083,21 @@ public class MySystem {
         lg.debug("This stdout file is associated with run counter " + runCounter + ".");
         lg.info("Simulation started.");
         startTime = System.currentTimeMillis();
-        etaTracker.initialize(startTime);
+
+        lg.debug("Default Global Folder: " + g.getDefaultFolder());
+        lg.debug("Global Input File: " + g.getInputFile());
+        lg.debug("MySystem Folder: " + folder);
+        lg.debug("MySystem Data Folder: " + dataFolder);
+
+        // Initialize the ETA tracker for this run.
+        // We only want to track ETA for run 1, initialize() will disable tracking for any other run.
+        try {
+            etaTracker.initialize(g, runCounter, startTime);
+        } catch (Exception ex) {
+            lg.error("ETA tracker initialization failed, disabling ETA for this run.", ex);
+            etaTracker.setUseHardcodedSchedule(false);
+            etaTracker.setUseDefaultSchedule(false);
+        }
 
         // create fresh log file immediately at startup for all runs in the batch except for run #0
         if (useOutputFile && runCounter != 0) {
@@ -1200,9 +1214,6 @@ public class MySystem {
         } catch (IOException e) {
             lg.error("Failed to write file 'RunningTime.txt' in: " + dataFolder.getAbsolutePath(), e);
         }
-
-        // TODO: Write last ETA snapshot and real duration to file that will be used by watchdog
-        //  use etaTracker.getLastSnapshot() and etaTracker.getTotalDuration()
 
         lg.info("Simulation finished. Writing more data.");
         this.writeMoleculeIDs();

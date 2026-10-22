@@ -1,12 +1,12 @@
 package edu.uchc.cam.langevin.langevinnovis01;
 
+import edu.uchc.cam.langevin.helpernovis.SolverConstants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.WorkerEvent;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -15,31 +15,73 @@ import java.util.Date;
 
 public class Watchdog {
 
-    public static final Logger lg = LogManager.getLogger(ConsolidationPostprocessor.class);
+    public static final Logger lg = LogManager.getLogger(Watchdog.class);
+
+    // message of the exception thrown when the log file of run #1 never shows up (or stays stale) within the timeout
+    // tests use it to verify that the watchdog failed for this exact reason
+    public static final String TimeoutFreshLogNotFound = "Watchdog timeout: fresh log file not found";
 
     private Global g;
     private final VCellMessaging vcellMessaging;
     private int numRuns;        // number of runs
     private final boolean useOutputFile;
-    private final int watchdogTick;
+    private final long epochStartTimeMS;  // time in milliseconds, any log files older than it are to be considered stale
+
+    // number of concurrent jobs we run effectively, used to compute number of batches
+    // since ETA is the duration of one simulation, actually the whole run will be (eta * num batches)
+    // ex: 7 jobs in total, 3 concurrent jobs, we have 3 batches: batch 1: jobs 0,1,2; batch 2: jobs 3,4,5; batch 3: job 6
+    private final int maxConcurrentJobs;
+    private int numBatches;     // see above. Computed once in setup
+
+    // base tick interval in seconds, received as command line argument
+    private final int watchdogBaseTickSec;
+
+    // current tick interval, which is adjusted based on the ETA (if available).
+    // will default to base tick interval if ETA is not available
+    private int watchdogCurrentTickSec = 10;    // feels like a good compromise for the stale loop when there's no ETA yet
+
+    // time we wait for the simulation #1 log file to be created or updated before we consider that something went
+    // wrong and exit the watchdog entirely
     private final int watchdogTimeout;
 
-    long watchdogStartTime;             // time when the watchdog started, used for timeout calculations
+    // used internally in updateProgress()
+//    long watchdogStartTime;             // time when the watchdog started, used for timeout calculations
     private int[] latestPercent;        // latest percent for each run
     private long[] lastModifiedSeen;    // last modified timestamp we last processed
     private double lastBatchPercent;    // percent at previous tick
 
+    // true when every run reported 100%, computed in the integer domain to avoid double precision traps
+    // (0.999999997 instead of 1.0) - the watchdog exits gracefully when this becomes true
+    private boolean allRunsFinished = false;
+
+    // used internally in updateEta()
+    private long lastEtaModSeen = 0L;
+
     private String simulationName;      // model / simulation name (without extension)
     private File simulationFolder;      // top folder, where the input file is (and also the .ida and ,json files are)
 
+    private File etaFile;               // file where the ETA is written by simulation 1
+
+    // flags to indicate if we need to send a progress / ETA event
+    // this is the "ready to send" stuff we use in the while loop
+    // they are computed / set in updateProgress() and updateEta()
+    boolean etaChanged = false;
+    boolean progressChanged = false;
+    // this is the total duration of the simulation, duration of run #1 multiplied by the number of batches,
+    // which is (numRuns / maxConcurrentJobs) rounded up
+    // this is not remaining time!
+    int estimatedTimeSec = 0;
+    double lastProgress = 0.0;
 
     public Watchdog(Global g, int numRuns, boolean useOutputFile, VCellMessaging vcellMessaging,
-                    int watchdogTick, int watchdogTimeout) {
+                    long watchdogCutoff, int maxConcurrentJobs, int watchdogTick, int watchdogTimeout) {
         this.g = g;
         this.numRuns = numRuns;
         this.useOutputFile = useOutputFile;
         this.vcellMessaging = vcellMessaging;
-        this.watchdogTick = watchdogTick;
+        this.epochStartTimeMS = watchdogCutoff * 1000L;  // convert seconds to milliseconds
+        this.maxConcurrentJobs = maxConcurrentJobs;
+        this.watchdogBaseTickSec = watchdogTick;
         this.watchdogTimeout = watchdogTimeout;
     }
 
@@ -64,31 +106,41 @@ public class Watchdog {
 
     public void setup() {
 
-        watchdogStartTime = System.currentTimeMillis();
+        // we just inform the user that the watchdog started, but we do not use watchdog start time because of potential
+        // race condition with start time of the simulations (there is no guarantee that the watchdog starts first)
         SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
-        String dateTime = sdf.format(new Date(watchdogStartTime));
-        lg.info("Watchdog started at " + dateTime + " (watchdogTick=" + watchdogTick + " seconds, watchdogTimeout=" + watchdogTimeout + " seconds)");
+        String dateTime = sdf.format(new Date(System.currentTimeMillis()));
+        lg.info("Watchdog started at " + dateTime + " (watchdogTick=" + watchdogBaseTickSec + " seconds, watchdogTimeout=" + watchdogTimeout + " seconds)");
+        lg.info("Watchdog: Single source of truth for start time of current slurm job is epochStartTimeMS = " + epochStartTimeMS + " ms");
+        String epochStartDateTime = sdf.format(new Date(epochStartTimeMS));
+        lg.info("Watchdog: Epoch start time (formatted): " + epochStartDateTime);
+
+        numBatches = (numRuns + maxConcurrentJobs - 1) / maxConcurrentJobs;   // round up division (integer ceiling)
+        lg.info("Watchdog: " + numRuns + " runs, " + maxConcurrentJobs + " concurrent -> " + numBatches + " batch(es)");
 
         latestPercent = new int[numRuns];       // initialize progress counters
         lastModifiedSeen = new long[numRuns];
-        lastBatchPercent = 0;
+        // -1 forces the first tick of the progress loop to report as "changed", so the first event goes out
+        // immediately (with the ETA if we already have one) instead of being throttled behind a separate 0.0 event
+        lastBatchPercent = -1;
+
+        simulationFolder = g.getDefaultFolder();
 
         File inputFile = g.getInputFile();      // model / simulation input file (the .langevininput file)
         simulationName = inputFile.getName();
-        lg.info("Watchdog analyzing input file for simulation: " + simulationName);
-
-        String filePath = inputFile.getAbsolutePath();
-        filePath = filePath.substring(0, filePath.length() - simulationName.length());  // Strip the file name off of the path
-        simulationFolder = new File(filePath);
-
         int dotIndex = simulationName.lastIndexOf('.');     // Strip extension off the file name
         if (dotIndex > 0) {
             simulationName = simulationName.substring(0, dotIndex);
         } else {
             throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
         }
-        lg.info("Working folder : " + simulationFolder.getAbsolutePath());
-        lg.info("Simulation name: " + simulationName);
+
+        etaFile = new File(simulationFolder, simulationName + ".eta");
+
+        lg.info("Watchdog: Working folder : " + simulationFolder.getAbsolutePath());
+        lg.info("Watchdog: Simulation name: " + simulationName);
+        lg.info("Watchdog: Input file name: " + inputFile.getName());
+        lg.info("Watchdog: ETA file name  : " + etaFile.getName());   // ex: SimID_123456789_0_.eta
     }
 
 
@@ -96,82 +148,133 @@ public class Watchdog {
 
         lg.info("Watchdog entering doWork()");
 
-        // TODO: we send just one of this to see what it does on the client side (eventually we'll use it for ETA maybe)
-        vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent("First WorkerAlive Event"), VCellMessaging.ThrowOnException.NO);
-
-
-//        long start = System.currentTimeMillis();
         long timeoutMillis = watchdogTimeout * 1000L;
         File log1 = new File(simulationFolder, simulationName + "1.log");
+
+        boolean notifiedStaleLog = false;   // we only notify once about stale log files, to avoid spamming the log
+        boolean notifiedWaitingForFreshLog = false;   // we only notify once about waiting for fresh log files, to avoid spamming the log
+        //
+        //  we may be running into a race condition where slurm may start the watchdog after sim 1 is already running,
+        //  and the log file may be created before the watchdog starts! (and it will look stale until next 1% update,
+        //  which may be hours later)
+        //
+        // we are going to use a slurm epoch time, acquired at the start of the slurm job, and we will use it as
+        // authoritative to determine if a log file is stale or not. If the log file is older than the epoch time,
+        // we assume that it belongs to a previous run and we ignore it.
+        //
+        // langevin_x64 simulate --output-log=/simdata/danv/SimID_327174218_0_6.log /simdata/danv/SimID_327174218_0_.langevinInput 6 -tid 0
+        // langevin_x64 simulate --output-log=/simdata/danv/SimID_327174218_0_1.log /simdata/danv/SimID_327174218_0_.langevinInput 1 -tid 0
+        // langevin_x64 watchdog /simdata/danv/SimID_327174218_0_.langevinInput 7 --watchdog-tick=30 --watchdog-timeout=600 --vc-send-status-config=/simdata/danv/SimID_327174218_0_.langevinMessagingConfig
+        // langevin_x64 simulate --output-log=/simdata/danv/SimID_327174218_0_2.log /simdata/danv/SimID_327174218_0_.langevinInput 2 -tid 0
+        // ...
 
         // first while loop, we look for the log file for run #1 to be created, meaning that slurm started launching simulation tasks
         // ignore stale logs from previous runs
         while (true) {
             // the first log file, for simulation 1 should be created very soon, although it will be empty
             // for very long simulation (may take 1 week!) the first 1% advance may take hours though
-            long elapsed = System.currentTimeMillis() - watchdogStartTime;
+            long elapsed = System.currentTimeMillis() - epochStartTimeMS;   // elapsed time since the start of the slurm job
 
             if (log1.exists()) {
                 long lastModified = log1.lastModified();
 
-                if (lastModified >= watchdogStartTime) {
-                    lg.info("Found fresh log file for run #1: " + log1.getAbsolutePath()
+                if (lastModified >= epochStartTimeMS) {
+                    lg.info("Watchdog: Found fresh log file for run #1: " + log1.getAbsolutePath()    // found fresh log file!
                             + " (lastModified=" + lastModified + ")");
                     break;   // proceed to second loop
                 } else {
-                    lg.warn("Ignoring stale log file for run #1: " + log1.getAbsolutePath()
-                            + " (lastModified=" + lastModified
-                            + ", watchdogStart=" + watchdogStartTime + ")");
+                    if(!notifiedStaleLog) {
+                        lg.warn("Watchdog: Ignoring stale log file for run #1: " + log1.getAbsolutePath()
+                                + " (lastModified=" + lastModified
+                                + ", epochStartTimeMS=" + epochStartTimeMS + ")");
+                        notifiedStaleLog = true;
+                    }
                 }
             }
-
-            lg.info("Waiting for fresh log file: " + log1.getAbsolutePath()
-                    + " (elapsed time: " + (elapsed / 1000L) + " seconds)");
+            if(!notifiedWaitingForFreshLog) {
+                lg.info("Watchdog: Waiting for fresh log file: " + log1.getAbsolutePath()
+                        + " (elapsed time: " + (elapsed / 1000L) + " seconds)");
+                notifiedWaitingForFreshLog = true;
+            }
 
             if (elapsed >= timeoutMillis) {
-                lg.error("Timeout waiting for fresh log file: " + log1.getAbsolutePath());
-                throw new RuntimeException("Watchdog timeout: fresh log file not found");
+                lg.error("Watchdog: Timeout waiting for fresh log file: " + log1.getAbsolutePath());
+                throw new RuntimeException(TimeoutFreshLogNotFound);
             }
 
             // Sleep once per tick
             try {
-                Thread.sleep(watchdogTick * 1000L);
+                Thread.sleep(watchdogCurrentTickSec * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Watchdog interrupted: ", e);
             }
         }
-
-        // now we start a new loop where we check for progress.
+        // --------------------------------------------------------------------------------
+        // now we start a new loop where we check for progress and ETA.
         // at watchdog tick intervals, we check the log file for new lines.
         // If we don't see any new lines we just send a worker alive event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(...
         // if we see any new lines we calculate progress and send progress event
         // vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(.......), VCellMessaging.ThrowOnException.NO);
-        lg.info("Watchdog entering progress monitoring loop for simulation: " + simulationName);
-        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - watchdogStartTime), VCellMessaging.ThrowOnException.NO);
-
+        // --------------------------------------------------------------------------------
+        lg.info("Watchdog entering progress and ETA monitoring loop for simulation: " + simulationName);
+//        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(0.0, System.currentTimeMillis() - epochStartTimeMS), VCellMessaging.ThrowOnException.NO);
         long lastTick = System.currentTimeMillis();
+        boolean watchdogCurrentTickAdjusted = false;
+        watchdogCurrentTickSec = chooseAdaptiveTick(0); // shortest initial tick interval, will be adjusted based on ETA if available
+        lg.info("Watchdog: initial tick interval " + watchdogCurrentTickSec + " seconds");
         while (true) {
 
-            // TODO: someday in the future we will also look for ETA estimator
-
             long now = System.currentTimeMillis();
-            long elapsed = (now - lastTick) / 1000L;
+            long elapsedSinceLastTick = now - lastTick;
+            // we get timestamps from the solvers, but this one is authoritative to ensure monotonicity
+            long elapsedSinceStart = now - epochStartTimeMS;
 
             // Log that we are alive inside the second loop
-            lg.info("Watchdog progress loop tick — elapsed " + elapsed + " seconds since last tick");
+            lg.info("Watchdog progress loop tick - elapsed " + (elapsedSinceLastTick / 1000) + " seconds since last tick");
 
-            // Reset tick timer
-            lastTick = now;
+            etaChanged = false;
+            progressChanged = false;
+            lastTick = now;     // reset tick timer
 
-            update();
+            etaChanged = updateEta();               // sets estimatedTimeSec
+            progressChanged = updateProgress();     // sets lastProgress and allRunsFinished
 
-            // Sleep for watchdogTick seconds
-            try {
-                // TODO: consider using a ScheduledExecutorService instead of Thread.sleep() for better timing accuracy and interrupt handling
-                // TODO: we may want to adjust the sleep duration based on the ETA estimation to avoid spamming the messaging system and / or the log
-                Thread.sleep(watchdogTick * 1000L);
+            // adaptive tick interval adjustment based on ETA, if available - or reset to base tick if not
+            if(etaChanged) {
+                // if ETA changed, we may need a different tick interval suitable for the estimated total simulation time
+                // most of the time the new ETA falls in the same bucket and the tick stays the same
+                // note that estimatedTimeSec is the duration of the whole simulation (run #1 duration multiplied by
+                // the number of batches)
+                int newTickSec = chooseAdaptiveTick(estimatedTimeSec);
+                if(newTickSec != watchdogCurrentTickSec) {
+                    lg.info("Watchdog: adjusting tick interval from " + watchdogCurrentTickSec + " to " + newTickSec + " seconds");
+                    watchdogCurrentTickSec = newTickSec;
+                }
+                watchdogCurrentTickAdjusted = true;     // an ETA arrived, so we no longer need the no-ETA timeout fallback
+            }
+            if(elapsedSinceStart >= timeoutMillis && watchdogCurrentTickAdjusted == false) {
+                // no eta was ever computed in quite a long time, we assume something went wrong and
+                // we reset the watchdog tick interval to the base tick interval
+                lg.info("Watchdog: Timeout waiting for an ETA update, defaulting to base tick interval of " + watchdogBaseTickSec + " seconds");
+                watchdogCurrentTickSec = watchdogBaseTickSec;   // reset to base tick interval
+                watchdogCurrentTickAdjusted = true;   // counts as an adjustment; we only need to do this once
+            }
+
+            if(etaChanged || progressChanged) {
+                // we send both progress and ETA in the same event if either changed
+                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTimeSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
+            }
+
+            // the tick where the last run reaches 100% is also a progress change, so the 1.0 event was just sent above
+            if(allRunsFinished) {
+                lg.info("Watchdog: all " + numRuns + " runs reached 100%, exiting gracefully");
+                return;     // exit the watchdog gracefully
+            }
+
+            try {                   // --------------------------- sleep for watchdogTick seconds
+                Thread.sleep(watchdogCurrentTickSec * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 lg.warn("Watchdog interrupted during progress loop");
@@ -180,10 +283,120 @@ public class Watchdog {
         }
     }
 
+    // we choose a watchdog tick suitable for the estimated total simulation time,
+    // so we don't sample too often the filesystem for long simulations where each 1% progress may take hours and
+    // nothing happens in between
+    private int chooseAdaptiveTick(int totalSec) {
+        if (totalSec < 600)       return 10;    // < 10 minutes, tick every 10 seconds
+        if (totalSec < 1800)      return 15;    // < 30 minutes, tick every 15 seconds
+        if (totalSec < 3600)      return 20;    // < 1 hour, tick every 20 seconds
+        if (totalSec < 7200)      return 30;    // < 2 hours, tick every 30 seconds
+        if (totalSec < 14400)     return 60;    // < 4 hours, tick every 60 seconds
+        // anything longer, we tick every 2 minutes, which is a nice compromise between low spamming and responsiveness
+        // for very long sims we won't spam the messaging system too often anyway,
+        // since we only fire events when progress changes
+        return 120;
+    }
+
+
     // -----------------------------------------------------------------------------------
-    // this is where we will read the log files and send progress events to vcellMessaging
+    // this is where we read the ETA file and update the lastEta value
     // -----------------------------------------------------------------------------------
-    private void update() {
+    private boolean updateEta() {
+
+        if (etaFile == null || !etaFile.exists()) {     // If ETA file does not exist, nothing to do
+            return false;
+        }
+        long lastMod = etaFile.lastModified();
+        if (lastMod < epochStartTimeMS) {              // Ignore stale ETA (from previous runs)
+            return false;
+        }
+        if (lastMod <= lastEtaModSeen) {                // No new ETA since last tick
+            return false;
+        }
+
+        // --- Read only the tail of the file (like the log parser) ---
+        String lastLine = null;
+        try (RandomAccessFile raf = new RandomAccessFile(etaFile, "r")) {
+
+            long fileLength = raf.length();
+            long seekPos = Math.max(0, fileLength - 2048);   // read last ~2KB
+            raf.seek(seekPos);
+
+            String line;
+            while ((line = raf.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    lastLine = line.trim();   // keep overwriting -> last non-empty line
+                }
+            }
+
+        } catch (Exception ex) {
+            lg.warn("Failed to read ETA file tail " + etaFile + ": " + ex.getMessage());
+            return false;
+        }
+
+        if (lastLine == null) {
+            return false;   // empty file
+        }
+
+        // --- Parse the last ETA record ---
+        // Format: totalSec=123, confidence=850, timestampSec=1727890
+        int totalSec = -1;
+        int confidence = -1;
+        int timestampSec = -1;
+
+        try {
+            String[] parts = lastLine.split(",");
+            for (String part : parts) {
+                String[] kv = part.trim().split("=");
+                if (kv.length != 2) continue;
+
+                String key = kv[0].trim();
+                String val = kv[1].trim();
+
+                switch (key) {
+                    case SolverConstants.EtaEstimatedTotalSec:
+                        totalSec = Integer.parseInt(val);
+                        break;
+                    case SolverConstants.EtaConfidence:
+                        confidence = Integer.parseInt(val);
+                        break;
+                    case SolverConstants.EtaTimestampSec:
+                        timestampSec = Integer.parseInt(val);
+                        break;
+                }
+            }
+        } catch (Exception ex) {
+            lg.warn("Failed to parse ETA line '" + lastLine + "': " + ex.getMessage());
+            return false;
+        }
+
+        // Validate
+        if (totalSec <= 0 || timestampSec <= 0) {
+            lg.warn("Invalid ETA record: " + lastLine);
+            return false;
+        }
+
+        // Update internal state
+        // totalSec is the duration of a single run (run #1); the whole job runs numBatches batches sequentially
+        long batchTotalSec = (long) totalSec * numBatches;
+        int newEstimatedTimeSec = (int) Math.min(batchTotalSec, Integer.MAX_VALUE);
+        lastEtaModSeen = lastMod;       // this file version is processed, whether or not the estimate changed
+        if (newEstimatedTimeSec == estimatedTimeSec) {
+            return false;   // new ETA snapshot, but the whole-second estimate is the same: nothing to report
+        }
+        estimatedTimeSec = newEstimatedTimeSec;     // this is what we send in the event
+        lg.info("   watchdog.updateETA(): ETA changed: singleRunSec=" + totalSec + ", numBatches=" + numBatches +
+                ", estimatedTotalSec=" + estimatedTimeSec +
+                ", confidence=" + confidence +
+                ", timestampSec=" + timestampSec);
+        return true;    // ETA changed
+    }
+
+    // -----------------------------------------------------------------------------------------------------
+    // this is where we read the log files and compute the overall progress percentage for the batch of runs
+    // -----------------------------------------------------------------------------------------------------
+    private boolean updateProgress() {
 
         int sum = 0;
 
@@ -201,7 +414,7 @@ public class Watchdog {
 
             long lastMod = f.lastModified();
             // Ignore stale logs, we get here if there's a fresh log for run index 1, but we can't be sure about the others
-            if (lastMod < watchdogStartTime) {
+            if (lastMod < epochStartTimeMS) {
                 latestPercent[i] = 0;
                 sum += 0;
                 continue;
@@ -224,21 +437,21 @@ public class Watchdog {
             }
             sum += latestPercent[i];
         }
+        allRunsFinished = (sum == 100 * numRuns);   // integer check, see comment at declaration
 
         double batchPercent = (double)sum / (double)numRuns;
 
-        double now = System.currentTimeMillis();
-        double elapsed = now - watchdogStartTime;
-
         // Compare with previous tick
         if (batchPercent != lastBatchPercent) {
-            lg.info(String.format("Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
-            lastBatchPercent = batchPercent;
-            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastBatchPercent/100, elapsed), VCellMessaging.ThrowOnException.NO);
+            lg.info(String.format("   watchdog.updateProgress(): Batch progress changed (progressEvent): %.6f%% -> %.6f%%", lastBatchPercent, batchPercent));
+            lastBatchPercent = batchPercent;        // this is used internally, here in updateProgress()
+            lastProgress = lastBatchPercent/100;    // this is what we send in the event and what the user sees
+            return true;  // progress changed
+
         } else {
             // reducing the spam for now by commenting out useless message
 //            lg.info(String.format("Batch progress unchanged (workerAliveEvent) at %.6f%%", lastBatchPercent));
-            vcellMessaging.sendWorkerEvent(WorkerEvent.workerAliveEvent(), VCellMessaging.ThrowOnException.NO);
+            return false;  // no progress change
         }
     }
 

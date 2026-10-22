@@ -1,8 +1,11 @@
 package edu.uchc.cam.langevin.helpernovis;
 
-import edu.uchc.cam.langevin.langevinnovis01.MySystem;
+import edu.uchc.cam.langevin.langevinnovis01.Global;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import java.io.File;
+import java.io.FileWriter;
 
 public class EtaTracker {
 
@@ -11,14 +14,25 @@ public class EtaTracker {
     // ----------------------------------------------------------------------
     // Configurable parameters (with defaults)
     // ----------------------------------------------------------------------
-    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 1000L; // default 1 hour
-    private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: 1 hour)
+    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 14 * 1000L; // default 14 hours
+    private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: see above)
+
     private int[] etaHardcodedScheduleSeconds = {    // hardcoded schedule of when to log ETA (in seconds) configurable by user
-            1,2,3,4,5,10,20,30,40,60
+            2,4,10,20,40,60,120,
+            5*60,       // 5 minutes
+            10*60,      // 10 minutes
+            30*60,      // 30 minutes
+            3600,       // 1 hour
+            2*3600,     // 2 hours
+            4*3600,     // 4 hours
+            8*3600,     // 8 hours
+            12*3600     // 12 hours
     };
+
+    private long defaultScheduleIntervalMs = 60 * 60 * 4 * 1000L;   // default schedule interval (4 hours) after hardcoded schedule ends
+
     private boolean bUseHardcodedSchedule = true;   // use hardcoded schedule (true) or not (false)
     private boolean bUseDefaultSchedule = false;     // use default schedule (true) or not (false)
-    private long defaultScheduleIntervalMs = 60_000L;   // default schedule interval (1 minute) after hardcoded schedule ends
 
     // ----------------------------------------------------------------------
     // Internal scheduling state
@@ -46,17 +60,37 @@ public class EtaTracker {
     private long   lastEtaHighNs      = -1;   // upper confidence bound (ns)
     private double lastEtaProgress    = -1.0; // progress fraction at last snapshot
 
+    // the watchdog will read this file to send early ETA to the user, long simulations may take weeks
+    private File etaFile = null;
+
     // ----------------------------------------------------------------------
     // Constructor
     // ----------------------------------------------------------------------
     public EtaTracker() {
-        // Nothing to do here
     }
 
     // ----------------------------------------------------------------------
     // Initialize tracker for a new run
     // ----------------------------------------------------------------------
-    public void initialize(long startTimeMs) {
+    public void initialize(Global g, int runCounter, long startTimeMs) {
+
+        // we disable the tracker entirely if runCounter != 1 (only run 1 is tracked)
+        if(runCounter != 1) {
+            bUseHardcodedSchedule = false;
+            bUseDefaultSchedule = false;
+        }
+
+        // we initialize the eta tracker output file, which will be read by the watchdog to send early ETA to the user
+        if(runCounter == 1) {
+            String simulationName  = g.getInputFile().getName();
+            int dotIndex = simulationName.lastIndexOf('.');     // Strip extension off the file name
+            if (dotIndex > 0) {
+                simulationName = simulationName.substring(0, dotIndex);
+            } else {
+                throw new IllegalArgumentException("Input file name must have an extension: '" + simulationName + "'");
+            }
+            etaFile = new File(g.getDefaultFolder(), simulationName + ".eta");
+        }
 
         this.startTimeMs = startTimeMs;
         this.etaLoggingCutoffMs = startTimeMs + DEFAULT_ETA_LOGGING_CUTOFF_MS;
@@ -80,7 +114,7 @@ public class EtaTracker {
         etaHardcodedScheduleIndex = 0;
 
         // ------------------------------------------------------------
-        // MODE SELECTION — STRICT AND EXPLICIT
+        // MODE SELECTION - STRICT AND EXPLICIT
         // ------------------------------------------------------------
 
         // MODE 4: ETA DISABLED
@@ -96,8 +130,7 @@ public class EtaTracker {
                 throw new IllegalStateException("Hardcoded schedule enabled but no schedule array provided.");
             }
             nextEtaTimeMs = startTimeMs + etaHardcodedScheduleSeconds[0] * 1000L;
-            lg.info("Initialize: ETA logging using hardcoded schedule only. " +
-                    "First ETA at " + (nextEtaTimeMs - startTimeMs) + "ms.");
+            lg.info("Initialize: ETA logging using hardcoded schedule only. " + "First ETA computed at " + (nextEtaTimeMs - startTimeMs) + "ms.");
             return;
         }
 
@@ -108,7 +141,7 @@ public class EtaTracker {
                                 "cutoff=" + DEFAULT_ETA_LOGGING_CUTOFF_MS + "ms, interval=" + defaultScheduleIntervalMs + "ms.");
             }
             nextEtaTimeMs = startTimeMs + defaultScheduleIntervalMs;
-            lg.info("Initialize: ETA logging using default schedule only. " + "First ETA at " + (nextEtaTimeMs - startTimeMs) + "ms.");
+            lg.info("Initialize: ETA logging using default schedule only. " + "First ETA computed at " + (nextEtaTimeMs - startTimeMs) + "ms.");
             return;
         }
 
@@ -127,17 +160,17 @@ public class EtaTracker {
                                 etaHardcodedScheduleSeconds[etaHardcodedScheduleSeconds.length - 1] * 1000L + "ms) when both schedules are enabled.");
             }
             nextEtaTimeMs = startTimeMs + etaHardcodedScheduleSeconds[0] * 1000L;
-            lg.info("Initialize: ETA logging using hardcoded schedule first, then default schedule. First ETA at " + (nextEtaTimeMs - startTimeMs) + "ms.");
+            lg.info("Initialize: ETA logging using hardcoded schedule first, then default schedule. First ETA computed at " + (nextEtaTimeMs - startTimeMs) + "ms.");
             return;
         }
         // Should never reach here
         throw new IllegalStateException("Invalid ETA configuration.");
     }
 
+
     public boolean isDisabled() {
         return bUseHardcodedSchedule == false && bUseDefaultSchedule == false;
     }
-
 
     // ----------------------------------------------------------------------
     // Setters for tests
@@ -162,6 +195,7 @@ public class EtaTracker {
     // Update iteration statistics
     // ----------------------------------------------------------------------
     public void updateIterationStats(long iterDurationNs) {
+
         iterCount++;
 
         if (iterDurationNs < minIterTime) minIterTime = iterDurationNs;
@@ -183,8 +217,7 @@ public class EtaTracker {
             return;
         }
 
-        if (iterCount <= 10) {  // prevents garbage ETA estimates during warmup phase of the simulation
-            // TODO: some debugging is needed, apparently this never happens
+        if (iterCount < 10) {  // prevents garbage ETA estimates during warmup phase of the simulation
             lg.debug("ETA logging skipped: only " + iterCount + " iterations completed, skip warmup phase iterations.");
             return;
         }
@@ -210,6 +243,8 @@ public class EtaTracker {
                 ", remaining=" + IOHelp.formatNanoseconds(2, lastEtaRemainingNs) +
                 ", CI=[" + IOHelp.formatNanoseconds(2, lastEtaLowNs) + " .. " +
                 IOHelp.formatNanoseconds(2, lastEtaHighNs) + "]");
+
+        writeEtaSnapshot(lg);
 
         advanceSchedule();
     }
@@ -268,7 +303,7 @@ public class EtaTracker {
     }
 
     // ----------------------------------------------------------------------
-    // Getters for last snapshot
+    // Getters for last snapshot (mostly unused, or used in some @Tests)
     // ----------------------------------------------------------------------
     public long getLastEtaTimeMs() { return lastEtaTimeMs; }
     public long getLastEtaTotalNs() { return lastEtaTotalNs; }
@@ -283,4 +318,35 @@ public class EtaTracker {
     public long getMaxIterTime() { return maxIterTime; }
     public double getMeanIterTime() { return meanIterTime; }
     public double getVariance() { return (iterCount > 1) ? (m2 / (iterCount - 1)) : 0.0; }
+
+
+    private void writeEtaSnapshot(Logger lg) {
+        if (etaFile == null) {
+            lg.warn("ETA file not initialized, cannot write ETA snapshot.");
+            return;
+        }
+
+        try (FileWriter fw = new FileWriter(etaFile, true)) {   // append mode
+
+            // Convert nanoseconds -> integer seconds
+            int totalSec     = (int)(lastEtaTotalNs / 1_000_000_000L);
+            int timestampSec = (int)(lastEtaTimeMs / 1000L);
+
+            // Confidence: simple integer 0-1000 (you can refine later)
+            int confidence = (int)(Math.min(1.0, Math.max(0.0, lastEtaProgress)) * 1000);
+
+            // we don't really use the confidence right now, but we could do some sanity checks in the watchdog, look for drift, etc
+            // we don't use the timestamp right now, the watchdog own timestamp is authoritative, but we may want to use it for sanity checks in the future
+            fw.write(String.format(
+                    "%s=%d, %s=%d, %s=%d%n",
+                    SolverConstants.EtaEstimatedTotalSec,     totalSec,
+                    SolverConstants.EtaConfidence,   confidence,
+                    SolverConstants.EtaTimestampSec, timestampSec
+            ));
+
+        } catch (Exception ex) {
+            lg.warn("Failed to write ETA snapshot: " + ex.getMessage());
+        }
+    }
+
 }
