@@ -24,6 +24,7 @@ public class MembraneMoleculeErrorTest {
     //             L_z_out: 0.010000000000000009
     String inputFileContents =
             """
+            *** TIME INFORMATION ***
             Total time: 1.00E-2
             dt: 1.00E-8
             dt_spring: 1.00E-9

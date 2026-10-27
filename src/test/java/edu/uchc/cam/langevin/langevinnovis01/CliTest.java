@@ -26,6 +26,7 @@ public class CliTest {
 
     String inputFileContents =
             """
+            *** TIME INFORMATION ***
             Total time: 0.0025
             dt: 1.0E-8
             dt_data: 5.0E-4

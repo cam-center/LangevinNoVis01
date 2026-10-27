@@ -16,7 +16,7 @@ import java.nio.file.Path;
  * says which molecule and site each particle in it is.
  * <p>
  * This runs a short simulation rather than fabricating the subfolder, so it fails if the layout
- * MySystem writes to ever moves — otherwise the copy would silently find nothing and skip.
+ * MySystem writes to ever moves - otherwise the copy would silently find nothing and skip.
  */
 public class CanonicalizeRunFilesTest {
 
@@ -24,6 +24,7 @@ public class CanonicalizeRunFilesTest {
 
     private final String inputFileContents =
             """
+            *** TIME INFORMATION ***
             Total time: 3.0E-4
             dt: 1.0E-8
             dt_data: 1.0E-4
@@ -154,7 +155,7 @@ public class CanonicalizeRunFilesTest {
     }
 
     /**
-     * A run that produced no subfolder output must not fail the postprocess — the primary results
+     * A run that produced no subfolder output must not fail the postprocess - the primary results
      * are already written by the time these copies happen.
      */
     @Test
