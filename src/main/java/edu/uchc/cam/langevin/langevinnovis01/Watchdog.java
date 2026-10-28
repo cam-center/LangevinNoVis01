@@ -228,7 +228,7 @@ public class Watchdog {
 
             long now = System.currentTimeMillis();
             long elapsedSinceLastTick = now - lastTick;
-            // we get timestamps from the solvers, but this one is authoritative to ensure monotonicity
+            // wall-clock time since the slurm job started (the cutoff is authoritative), used for the timeouts
             long elapsedSinceStart = now - epochStartTimeMS;
 
             // Log that we are alive inside the second loop
@@ -264,7 +264,9 @@ public class Watchdog {
 
             if(etaChanged || progressChanged) {
                 // we send both progress and ETA in the same event if either changed
-                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTimeSec, elapsedSinceStart), VCellMessaging.ThrowOnException.NO);
+                // the timepoint is model (simulated) time, the same meaning as for the other solvers and the single run:
+                // average progress of the batch multiplied by the total simulated time of the model
+                vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(lastProgress, estimatedTimeSec, lastProgress * g.getTotalTime()), VCellMessaging.ThrowOnException.NO);
             }
 
             // the tick where the last run reaches 100% is also a progress change, so the 1.0 event was just sent above
