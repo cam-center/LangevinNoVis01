@@ -1188,7 +1188,13 @@ public class MySystem {
 
                 nextRealTime += (totalTime/100.0);
             }
-            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(time/(totalTime + dt), time), VCellMessaging.ThrowOnException.NO); // progress message are throttled by vcellMessaging
+            // progress as a fraction, and the total duration projected from it (this is total duration, not remaining time!)
+            // e.g. 10 minutes elapsed at 25% -> estimated total 40 minutes; 0 means unknown (VCell then shows nothing)
+            // in a batch the simulate runs use no-op messaging, so the estimate is computed but never sent; that's harmless
+            double progress = time/(totalTime + dt);
+            long elapsedMs = System.currentTimeMillis() - startTime;
+            int estimatedTimeSec = progress > 0 ? (int) Math.min(elapsedMs / progress / 1000, Integer.MAX_VALUE) : 0;
+            vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(progress, estimatedTimeSec, time), VCellMessaging.ThrowOnException.NO); // progress message are throttled by vcellMessaging
 
             // the expensive part of the simulation, update the system and relax the springs
             long iterStart = System.nanoTime();
@@ -1256,6 +1262,7 @@ public class MySystem {
         LangevinPostprocessor.writeIdaFile(dataFolder.toPath(),idaFile.toPath());
         LangevinPostprocessor.writeClustersFile(dataFolder.toPath(),clustersFile.toPath());
         vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(1.0, time), VCellMessaging.ThrowOnException.NO);
+        // we don't need to send a last estimate here since "completed" is right next, and we're going to display the Actual duration
         vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, time), VCellMessaging.ThrowOnException.NO);
         vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(time), VCellMessaging.ThrowOnException.NO);
         // </editor-fold>
