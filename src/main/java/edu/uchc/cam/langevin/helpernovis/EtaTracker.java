@@ -14,7 +14,9 @@ public class EtaTracker {
     // ----------------------------------------------------------------------
     // Configurable parameters (with defaults)
     // ----------------------------------------------------------------------
-    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 14 * 1000L; // default 14 hours
+    // default 60 days, after which we stop computing ETA, longer than any other simulation (2 weeks typical for long ones)
+    // basically ensuring that we don't stop computing ETA if default schedule is enabled
+    private long DEFAULT_ETA_LOGGING_CUTOFF_MS = 60 * 60 * 24 * 60 * 1000L;
     private long etaLoggingCutoffMs;        // we stop eta computing after cutoff (default: see above)
 
     private int[] etaHardcodedScheduleSeconds = {    // hardcoded schedule of when to log ETA (in seconds) configurable by user
@@ -25,8 +27,12 @@ public class EtaTracker {
             3600,       // 1 hour
             2*3600,     // 2 hours
             4*3600,     // 4 hours
+            6*3600,     // 6 hours
             8*3600,     // 8 hours
-            12*3600     // 12 hours
+            12*3600,    // 12 hours
+            16*3600,    // 16 hours
+            20*3600,    // 20 hours
+            24*3600     // 24 hours
     };
 
     private long defaultScheduleIntervalMs = 60 * 60 * 4 * 1000L;   // default schedule interval (4 hours) after hardcoded schedule ends
