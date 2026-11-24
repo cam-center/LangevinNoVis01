@@ -9,6 +9,8 @@ jobs:
     name: Langevin on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      # one broken platform would then no longer cancel the others, and we'd see every platform's result in a single run
+      fail-fast: false
       matrix:
         os: [macos-15-intel, windows-latest, ubuntu-latest, macos-14]
     steps:
@@ -20,7 +22,7 @@ jobs:
           java-version: '17.0.7'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          components: 'native-image'
+          # components: 'native-image'   # not needed: see CI explanation
           native-image-musl: 'true'
           native-image-job-reports: 'true'
         if: matrix.os == 'ubuntu-latest'
