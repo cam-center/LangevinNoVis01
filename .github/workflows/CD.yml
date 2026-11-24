@@ -9,8 +9,10 @@ jobs:
     name: Langevin on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      # one broken platform would then no longer cancel the others, and we'd see every platform's result in a single run
+      fail-fast: false
       matrix:
-        os: [macos-15-intel, windows-latest, ubuntu-latest, macos-14]
+        os: [macos-15-intel, windows-latest, ubuntu-latest, macos-15]
     steps:
       - uses: actions/checkout@v4
 
@@ -20,7 +22,7 @@ jobs:
           java-version: '17.0.7'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          components: 'native-image'
+          # components: 'native-image'   # not needed: see CI explanation
           native-image-musl: 'true'
           native-image-job-reports: 'true'
         if: matrix.os == 'ubuntu-latest'
@@ -32,11 +34,11 @@ jobs:
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' || matrix.os == 'windows-latest'
 
       - name: java build and test
         run: mvn test
-        if: matrix.os == 'macos-15-intel'|| matrix.os == 'macos-14'  || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel'|| matrix.os == 'macos-15'  || matrix.os == 'windows-latest'
 
       - name: static native build without test - linux only
         run: mvn -Pnative-static -DskipTests=true package
@@ -44,20 +46,20 @@ jobs:
 
       - name: non-static native build without test - macos or windows
         run: mvn -Pnative -DskipTests=true package
-        if: matrix.os == 'macos-15-intel'|| matrix.os == 'macos-14'  || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel'|| matrix.os == 'macos-15'  || matrix.os == 'windows-latest'
 
       - name: run native executable with --help option to verify build (zero return code)
         run: ./target/langevin --help
 
       - name: Upload macOS binary for universal merge
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-15'
         uses: actions/upload-artifact@v4
         with:
           name: langevin-${{ matrix.os }}
           path: ./target/langevin
 
       - name: Upload MacOS or Linux solver binary to release assets
-        if: github.event_name == 'release' && (matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'ubuntu-latest')
+        if: github.event_name == 'release' && (matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' || matrix.os == 'ubuntu-latest')
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -90,23 +92,23 @@ jobs:
     # Both binaries are named "langevin", so as soon as we download one of them we
     # need to rename it to avoid overwriting the other one.
     steps:
-      - name: Download macOS-13 binary
+      - name: Download macOS Intel binary
         uses: actions/download-artifact@v4
         with:
           name: langevin-macos-15-intel
           path: binaries
 
-      - name: Rename macOS-13 binary
+      - name: Rename macOS Intel binary
         run: mv binaries/langevin binaries/langevin-macos-15-intel
 
-      - name: Download macOS-14 binary
+      - name: Download macOS arm64 binary
         uses: actions/download-artifact@v4
         with:
-          name: langevin-macos-14
+          name: langevin-macos-15
           path: binaries
 
-      - name: Rename macOS-14 binary
-        run: mv binaries/langevin binaries/langevin-macos-14
+      - name: Rename macOS arm64 binary
+        run: mv binaries/langevin binaries/langevin-macos-15
 
       # this will go in the log of the run, useful for debugging
       - name: Inspect binaries directory
@@ -123,7 +125,7 @@ jobs:
         run: |
           lipo -create -output binaries/langevin-universal \
             binaries/langevin-macos-15-intel \
-            binaries/langevin-macos-14
+            binaries/langevin-macos-15
           lipo -archs binaries/langevin-universal
 
       - name: Upload universal binary to release

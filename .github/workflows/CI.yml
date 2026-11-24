@@ -5,8 +5,10 @@ jobs:
     name: Langevin on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      # one broken platform would then no longer cancel the others, and we'd see every platform's result in a single run
+      fail-fast: false
       matrix:
-        os: [macos-15-intel, windows-latest, ubuntu-latest, macos-14]
+        os: [macos-15-intel, windows-latest, ubuntu-latest, macos-15]
     steps:
       - uses: actions/checkout@v4
 
@@ -16,7 +18,9 @@ jobs:
           java-version: '17.0.7'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          components: 'native-image'
+          # not needed: native-image is bundled with GraalVM for JDK 17 (17.0.7 included), the macos/windows builds never asked for it;
+          # asking for it runs the old updater 'gu install', which now fails to download its component catalog from graalvm.org
+          # components: 'native-image'
           native-image-musl: 'true'
           native-image-job-reports: 'true'
         if: matrix.os == 'ubuntu-latest'
@@ -28,11 +32,11 @@ jobs:
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' || matrix.os == 'windows-latest'
 
       - name: java build and test
         run: mvn test
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' || matrix.os == 'windows-latest'
 
       - name: static native build without test - linux only
         run: mvn -Pnative-static -DskipTests=true package
@@ -40,7 +44,7 @@ jobs:
 
       - name: non-static native build without test - macos or windows
         run: mvn -Pnative -DskipTests=true package
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-14' || matrix.os == 'windows-latest'
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' || matrix.os == 'windows-latest'
 
       - name: run native executable with --help option to verify build (zero return code)
         run: ./target/langevin --help

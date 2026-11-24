@@ -290,7 +290,7 @@ public class IOHelp {
      *      formatNanoseconds(1, 500);                     // "500ns"
      *      formatNanoseconds(1, 12_000);                  // "12µs"
      *      formatNanoseconds(1, 8_000_000);               // "8ms"
-     *      formatNanoseconds(1, 2_345_678_900L);          // "2s 345ms"
+     *      formatNanoseconds(2, 2_345_678_900L);          // "2s 345ms"
      *      formatNanoseconds(1, 3_600_000_000_000L);      // "1h"
      *      formatNanoseconds(1, 172_800_000_000_000L);    // "2d"
      */

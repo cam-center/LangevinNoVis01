@@ -14,6 +14,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.vcell.data.LangevinPostprocessor;
 import org.vcell.messaging.VCellMessaging;
+import org.vcell.messaging.WorkerEvent;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -130,6 +131,18 @@ public class ConsolidationPostprocessor {
         } catch (IOException e) {
             lg.warn("Failed to canonicalize " + description + " file " + source + " -> " + target, e);
         }
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // Postprocess is the last step of a batch, so it reports the batch as done (before 1.4.18 the slurm script did it with curl).
+    // Same events, same order as at the end of a single run in MySystem: data, progress 1.0 (no estimate), completed.
+    // The timepoint is model time (the total time of the simulation), same meaning as for the watchdog and single runs.
+    // A failed send is only logged: the results are there, and the server reconciles the job state with slurm anyway.
+    public void sendFinalEvents() {
+        double totalTime = g.getTotalTime();
+        vcellMessaging.sendWorkerEvent(WorkerEvent.dataEvent(1.0, totalTime), VCellMessaging.ThrowOnException.NO);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.progressEvent(1.0, totalTime), VCellMessaging.ThrowOnException.NO);
+        vcellMessaging.sendWorkerEvent(WorkerEvent.completedEvent(totalTime), VCellMessaging.ThrowOnException.NO);
     }
 
     // -------------------------------------------------------------------------------------------------------
