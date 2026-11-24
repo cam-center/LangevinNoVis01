@@ -4,11 +4,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.vcell.messaging.VCellMessaging;
 import org.vcell.messaging.VCellMessagingLocal;
+import org.vcell.messaging.WorkerEvent;
+import org.vcell.messaging.WorkerStatus;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The postprocess step copies two of the simulate step's subfolder outputs up to flat, canonically
@@ -175,6 +179,50 @@ public class CanonicalizeRunFilesTest {
             Assertions.assertFalse(Files.exists(tempDirectory.resolve(SIM_NAME + "_SiteIDs_Run0.csv")));
         } finally {
             deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    /**
+     * Postprocess is the last step of a batch and reports it as done: data, progress 1.0 and completed,
+     * in this order, all with the model's total time as timepoint (before 1.4.18 the slurm script sent these).
+     * Lives here because this class already has a complete model; no simulation is needed for this.
+     * The test collects the final events into a list, then checks the order (DATA, PROGRESS, COMPLETED), and
+     * for each event progress 1.0, timepoint 3.0E-4 (the model's total time) and estimate 0.
+     */
+    @Test
+    public void sendFinalEventsReportsTheBatchAsDone() throws IOException {
+        Path tempDirectory = Files.createTempDirectory("test_final_events");
+        try {
+            Path modelFile = tempDirectory.resolve(SIM_NAME + ".langevinInput");
+            Files.writeString(modelFile, inputFileContents);
+            Global g = new Global(modelFile.toFile());
+            RecordingMessaging messaging = new RecordingMessaging();    // stores the events in a list instead of sending
+            ConsolidationPostprocessor cp = new ConsolidationPostprocessor(g, 1, false, messaging);
+
+            cp.sendFinalEvents();
+            List<WorkerEvent> sent = messaging.sent;
+
+            Assertions.assertEquals(3, sent.size(), "expected data, progress and completed: " + sent);
+            Assertions.assertEquals(WorkerStatus.JOB_DATA, sent.get(0).status());
+            Assertions.assertEquals(WorkerStatus.JOB_PROGRESS, sent.get(1).status());
+            Assertions.assertEquals(WorkerStatus.JOB_COMPLETED, sent.get(2).status());
+            for (WorkerEvent event : sent) {
+                Assertions.assertEquals(1.0, event.progress_fraction(), event.toString());
+                Assertions.assertEquals(3.0E-4, event.timepoint(), event.toString());     // "Total time: 3.0E-4" in the model
+                Assertions.assertEquals(0, event.estimated_time(), event.toString());     // no estimate, Actual follows at once
+            }
+        } finally {
+            deleteDirectory(tempDirectory.toFile());
+        }
+    }
+
+    // instead of sending anything, keeps the events in a list, in the order they were sent
+    private static class RecordingMessaging implements VCellMessaging {
+        private final List<WorkerEvent> sent = new ArrayList<>();
+
+        @Override
+        public void sendWorkerEvent(WorkerEvent event, ThrowOnException throwOnException) {
+            sent.add(event);
         }
     }
 

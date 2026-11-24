@@ -88,6 +88,8 @@ public class PostCommand implements Callable<Integer> {
         cp.canonicalizeTrajectoryFile();    // copy Run-0 viewer file to a flat name for VCell to serve
         cp.canonicalizeSiteIdsFile();       // ... and the site ids that name each particle in it
 
+        cp.sendFinalEvents();               // data, progress 1.0 and completed: the batch is done (no-op without messaging)
+
         modelFile = null;
         return 0;
     }
